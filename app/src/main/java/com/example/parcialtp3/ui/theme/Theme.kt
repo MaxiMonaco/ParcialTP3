@@ -1,58 +1,82 @@
 package com.example.parcialtp3.ui.theme
 
 import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+/** Esquema de color de VORA: verde profundo, acentos menta y lima, superficies tranquilas. */
+private val VoraColorScheme = lightColorScheme(
+    primary = VoraGreen,
     onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primaryContainer = VoraLime,            // CTA destacado (lima) con texto verde
+    onPrimaryContainer = VoraGreen,
+    secondary = VoraMint,
+    onSecondary = VoraGreen,                // texto verde sobre menta o lima (criterio de uso)
+    secondaryContainer = VoraMintTint,      // mensajes de apoyo y item activo
+    onSecondaryContainer = VoraGreen,
+    tertiary = VoraLime,
+    onTertiary = VoraGreen,
+    background = VoraBackground,
+    onBackground = VoraTextPrimary,
+    surface = VoraSurface,
+    onSurface = VoraTextPrimary,
+    surfaceVariant = VoraBackground,
+    onSurfaceVariant = VoraTextSecondary,
+    outline = VoraTextMuted,
+    outlineVariant = VoraBorder,
+    error = VoraError,
+    onError = Color.White,
+    // Tarjetas, campos y barras en blanco sobre el fondo casi blanco de la pantalla.
+    surfaceContainerLowest = VoraSurface,
+    surfaceContainerLow = VoraSurface,
+    surfaceContainer = VoraSurface,
+    surfaceContainerHigh = VoraSurface,
+    surfaceContainerHighest = VoraSurface,
 )
 
+/** Radios del diseno: 8 / 12 / 16 / 20 / 24 px (la pildora de 100 px se usa con CircleShape). */
+private val VoraShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),   // campos y mensajes
+    medium = RoundedCornerShape(16.dp),  // tarjetas
+    large = RoundedCornerShape(20.dp),   // paneles destacados
+    extraLarge = RoundedCornerShape(24.dp),
+)
+
+/**
+ * Tema de la app. Siempre claro (el diseno de Figma no tiene modo oscuro) y sin color dinamico,
+ * para que la app se vea igual en cualquier celular. Los parametros se conservan por compatibilidad.
+ */
 @Composable
 fun ParcialTP3Theme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    @Suppress("UNUSED_PARAMETER") darkTheme: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") dynamicColor: Boolean = false,
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        // Iconos oscuros en la barra de estado y de navegacion: el fondo es claro aunque el
+        // celular este en modo oscuro.
+        SideEffect {
+            val window = (view.context as Activity).window
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = true
+            controller.isAppearanceLightNavigationBars = true
         }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = VoraColorScheme,
         typography = Typography,
-        content = content
+        shapes = VoraShapes,
+        content = content,
     )
 }
