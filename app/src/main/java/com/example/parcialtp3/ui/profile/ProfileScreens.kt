@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.parcialtp3.shared.VoraAppBar
 import com.example.parcialtp3.shared.VoraAvatar
+import com.example.parcialtp3.shared.DemoDialogHost
+import com.example.parcialtp3.shared.rememberDemoDialog
 import com.example.parcialtp3.shared.VoraCard
 import com.example.parcialtp3.shared.VoraDarkPanel
 import com.example.parcialtp3.shared.VoraIconButton
@@ -130,7 +132,9 @@ fun ProfileDashboardScreen(
     onPreferencesClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
+        DemoDialogHost(demo)
         Row(verticalAlignment = Alignment.CenterVertically) {
             VoraTitle("Profile", Modifier.weight(1f))
             VoraIconButton("⚙", onSettingsClick, size = 40.dp)
@@ -168,8 +172,8 @@ fun ProfileDashboardScreen(
         SettingRow("◎", "Your Goals", "Build strength & improve fitness", onGoalsClick)
         SettingRow("☰", "Your Preferences", "Training, nutrition and coaching", onPreferencesClick)
         // "Connected Data" y "Account" no tienen pantalla propia en Figma: solo visuales.
-        SettingRow("❤", "Connected Data", "Health & activity data", onClick = {}, badge = "Synced")
-        SettingRow("🔒", "Account", "Subscription, notifications & privacy", onClick = {})
+        SettingRow("❤", "Connected Data", "Health & activity data", onClick = { demo.show("Los datos de salud conectados son de demostración.") }, badge = "Synced")
+        SettingRow("🔒", "Account", "Subscription, notifications & privacy", onClick = { demo.show("La cuenta no tiene pantalla propia en el diseño.") })
     }
 }
 
@@ -357,26 +361,28 @@ fun SettingsScreen(
     onLogOutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
+        DemoDialogHost(demo)
         VoraAppBar("Settings", onBackClick)
         SectionLabel("Account")
-        SettingRow("👤", "Alex Morgan", "alex@morgan.com", onClick = {})
-        SettingRow("☆", "VORA Premium", "Renews 14 June 2026", onClick = {})
-        SettingRow("✎", "Manage account", null, onClick = {})
+        SettingRow("👤", "Alex Morgan", "alex@morgan.com", onClick = { demo.show("Los datos de la cuenta son de ejemplo.") })
+        SettingRow("☆", "VORA Premium", "Renews 14 June 2026", onClick = { demo.show("La suscripción es de demostración.") })
+        SettingRow("✎", "Manage account", null, onClick = { demo.show("Administrar la cuenta no está incluido en esta versión.") })
         SectionLabel("App preferences")
         // Figma no marca que fila lleva a Voice & AI: la dejamos como fila propia (supuesto del grupo).
         SettingRow("🎙", "Voice & AI", "VORA Coach voice and coaching", onVoiceAiClick)
-        SettingRow("🔔", "Notifications", "Workout and meal reminders", onClick = {})
-        SettingRow("◎", "Units", "Metric (kg, cm, km)", onClick = {})
-        SettingRow("👁", "Appearance", "System default", onClick = {})
+        SettingRow("🔔", "Notifications", "Workout and meal reminders", onClick = { demo.show("Los recordatorios no están incluidos en esta versión.") })
+        SettingRow("◎", "Units", "Metric (kg, cm, km)", onClick = { demo.show("Solo se muestran unidades métricas.") })
+        SettingRow("👁", "Appearance", "System default", onClick = { demo.show("La app usa solo el tema claro de VORA.") })
         SectionLabel("Connected data")
-        SettingRow("❤", "Health & Activity", "Apple Watch & Health connected", onClick = {})
+        SettingRow("❤", "Health & Activity", "Apple Watch & Health connected", onClick = { demo.show("La conexión con Apple Health es de demostración.") })
         SectionLabel("Privacy & security")
-        SettingRow("🔒", "Privacy Policy", null, onClick = {})
-        SettingRow("🛡", "Permissions & Data Controls", null, onClick = {})
+        SettingRow("🔒", "Privacy Policy", null, onClick = { demo.show("La política de privacidad no está incluida en esta demostración.") })
+        SettingRow("🛡", "Permissions & Data Controls", null, onClick = { demo.show("Los permisos reales se piden desde el sistema Android.") })
         SectionLabel("Support")
-        SettingRow("?", "Help Centre", null, onClick = {})
-        SettingRow("✉", "Contact Support", null, onClick = {})
+        SettingRow("?", "Help Centre", null, onClick = { demo.show("El centro de ayuda no está incluido en esta demostración.") })
+        SettingRow("✉", "Contact Support", null, onClick = { demo.show("El soporte no está disponible en esta demostración.") })
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surface,

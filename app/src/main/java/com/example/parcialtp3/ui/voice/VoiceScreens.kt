@@ -383,10 +383,10 @@ fun VoiceErrorScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
             )
-            // "Allow Access" / "Not Now" son solo visuales: el permiso real es de otra etapa.
+            // Simulado: no se pide el permiso real. "Allow Access" reintenta; "Not Now" pasa a escribir.
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                VoraPrimaryButton("Allow Access", onClick = {}, modifier = Modifier.weight(1f))
-                VoraOutlinedButton("Not Now", onClick = {}, modifier = Modifier.weight(1f))
+                VoraPrimaryButton("Allow Access", onClick = onTryAgainClick, modifier = Modifier.weight(1f))
+                VoraOutlinedButton("Not Now", onClick = onTypeInsteadClick, modifier = Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(48.dp))

@@ -19,6 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.example.parcialtp3.shared.VoraAvatar
+import com.example.parcialtp3.shared.DemoDialogHost
+import com.example.parcialtp3.shared.rememberDemoDialog
 import com.example.parcialtp3.shared.VoraCard
 import com.example.parcialtp3.shared.VoraDarkChip
 import com.example.parcialtp3.shared.VoraDarkPanel
@@ -230,25 +236,28 @@ fun NotificationsScreen(
     onNutritionGoalClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var allRead by remember { mutableStateOf(false) }
+    val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
+        DemoDialogHost(demo)
         Row(verticalAlignment = Alignment.CenterVertically) {
             VoraIconButton("←", onBackClick, size = 40.dp)
             VoraTitle("Notifications", modifier = Modifier.weight(1f).padding(start = 12.dp))
-            // "Mark all as read" es solo visual: la funcionalidad es de otra etapa.
-            VoraTextLink("Mark all as read", onClick = {})
+            // Estado local: apaga los puntos de no leido (no se guarda).
+            VoraTextLink("Mark all as read", onClick = { allRead = true })
         }
 
         VoraOverline("Today")
         NotificationCard("✨", "VORA Coach", "2h ago", "Your weekly health review is ready.",
-            "We noticed your training consistency improved by 14% over the last week.", unread = true, onClick = onWeeklyReviewClick)
+            "We noticed your training consistency improved by 14% over the last week.", unread = !allRead, onClick = onWeeklyReviewClick)
         NotificationCard("🏋", "Workout Plan", "4h ago", "Upper Body Strength is ready.",
-            "Equipped for home/gym. Approx. 42 minutes.", unread = true, onClick = onWorkoutPlanClick)
+            "Equipped for home/gym. Approx. 42 minutes.", unread = !allRead, onClick = onWorkoutPlanClick)
         NotificationCard("🍎", "Nutrition Goal", "6h ago", "Protein target milestone alert.",
             "You require 36g more of protein to hit today's UK performance baseline.", unread = false, onClick = onNutritionGoalClick)
 
         VoraOverline("Yesterday", modifier = Modifier.padding(top = 8.dp))
         NotificationCard("🔥", "Milestone Reached", "1d ago", "4-day workout streak logged!",
-            "Outstanding work, Alex. Let's make it 5 today.", unread = false, onClick = {})
+            "Outstanding work, Alex. Let's make it 5 today.", unread = false, onClick = { demo.show("Hito alcanzado: racha de 4 días. No tiene pantalla propia en el diseño.") })
     }
 }
 

@@ -24,6 +24,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import com.example.parcialtp3.navigation.SampleIds
 import com.example.parcialtp3.shared.VoraAppBar
 import com.example.parcialtp3.shared.VoraBigOrb
+import com.example.parcialtp3.shared.DemoDialogHost
+import com.example.parcialtp3.shared.rememberDemoDialog
 import com.example.parcialtp3.shared.VoraCard
 import com.example.parcialtp3.shared.VoraChip
 import com.example.parcialtp3.shared.VoraDarkCard
@@ -260,12 +266,15 @@ fun WorkoutDetailsScreen(
     onExerciseClick: (exerciseId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
+    val workout = demoWorkout(workoutId)
     VoraScreen(modifier = modifier) {
+        DemoDialogHost(demo)
         VoraAppBar("Workout Overview", onBackClick)
         Column {
-            VoraTitle("Upper Body Strength")
-            Text("42 min  •  Moderate  •  5 exercises", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
-            Text("Focus: Chest • Back • Shoulders • Arms", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            VoraTitle(workout.title)
+            Text("${workout.minutes} min  •  ${workout.level}  •  ${workout.exercises.size} exercises", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+            Text("Focus: ${workout.focus}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         VoraTipCard {
             VoraOverline("VORA Coach note", color = VoraGreen)
@@ -275,13 +284,7 @@ fun WorkoutDetailsScreen(
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
-        listOf(
-            Triple("01", "Bench Press", "3 × 10 • Rest 90s"),
-            Triple("02", "Seated Cable Row", "3 × 12 • Rest 75s"),
-            Triple("03", "Shoulder Press", "3 × 10 • Rest 75s"),
-            Triple("04", "Dumbbell Lateral Raise", "3 × 12 • Rest 60s"),
-            Triple("05", "Tricep Pushdown", "3 × 12 • Rest 60s"),
-        ).forEachIndexed { i, (n, title, sub) ->
+        workout.exercises.forEachIndexed { i, (n, title, sub) ->
             val exerciseId = if (i == 0) SampleIds.EXERCISE_BENCH else SampleIds.EXERCISE_CABLE_ROW
             VoraCard(onClick = { onExerciseClick(exerciseId) }, contentPadding = 12.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -296,8 +299,7 @@ fun WorkoutDetailsScreen(
             }
         }
         VoraPrimaryButton("Start Workout", onStartWorkoutClick)
-        // "Edit workout" es solo visual (la edicion no esta en el alcance).
-        VoraOutlinedButton("Edit workout", onClick = {})
+        VoraOutlinedButton("Edit workout", onClick = { demo.show("Editar entrenamientos no está incluido en esta versión.") })
     }
 }
 
@@ -310,6 +312,7 @@ fun PreWorkoutScreen(
     onAskVoraClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val workout = demoWorkout(workoutId)
     DarkFrame(modifier) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
@@ -320,8 +323,8 @@ fun PreWorkoutScreen(
                 Text("✕", color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable(onClick = onCloseClick).padding(8.dp))
             }
             Column {
-                Text("Upper Body Strength", color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                Text("42 min • 5 exercises", color = VoraMint, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                Text(workout.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
+                Text("${workout.minutes} min • ${workout.exercises.size} exercises", color = VoraMint, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
             }
             PreCard("TODAY'S FOCUS", "Controlled Repetitions", "Keep concentric lifts explosive and focus on a slow, 2-second eccentric return for maximal hypertrophy stimulus.")
             PreCard("YOUR LAST SESSION", "Bench Press Volume", "Set 1: 40 kg × 10 • Set 2: 40 kg × 9 • Set 3: 37.5 kg × 10")
@@ -378,6 +381,9 @@ fun ActiveWorkoutScreen(
     onExerciseGuideClick: (exerciseId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Serie actual (estado local, no se guarda): Complete Set avanza y en la última termina el entrenamiento.
+    var currentSet by remember { mutableIntStateOf(2) }
+    val totalExercises = demoWorkout(workoutId).exercises.size
     DarkFrame(modifier) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
@@ -385,7 +391,7 @@ fun ActiveWorkoutScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f).clickable { onExerciseGuideClick(SampleIds.EXERCISE_CABLE_ROW) }) {
-                    Text("EXERCISE 2 OF 5", color = VoraMint, fontSize = 12.sp)
+                    Text("EXERCISE 2 OF $totalExercises", color = VoraMint, fontSize = 12.sp)
                     Text("Seated Cable Row", color = Color.White, style = MaterialTheme.typography.titleMedium)
                 }
                 Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.12f), modifier = Modifier.clip(CircleShape).clickable(onClick = onFinishWorkoutClick)) {
@@ -417,9 +423,9 @@ fun ActiveWorkoutScreen(
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SetPill("1", "Set 1", done = true, modifier = Modifier.weight(1f))
-                SetPill("2", "Set 2", selected = true, modifier = Modifier.weight(1f))
-                SetPill("3", "Set 3", modifier = Modifier.weight(1f))
+                SetPill("1", "Set 1", done = currentSet > 1, selected = currentSet == 1, modifier = Modifier.weight(1f))
+                SetPill("2", "Set 2", done = currentSet > 2, selected = currentSet == 2, modifier = Modifier.weight(1f))
+                SetPill("3", "Set 3", selected = currentSet == 3, modifier = Modifier.weight(1f))
             }
             Surface(shape = RoundedCornerShape(14.dp), color = Color.White.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -445,8 +451,9 @@ fun ActiveWorkoutScreen(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
-            // "Complete Set" es solo visual: contar series es logica de otra etapa.
-            VoraLimeButton("Complete Set", onClick = {})
+            VoraLimeButton(if (currentSet < 3) "Complete Set" else "Finish Workout", onClick = {
+                if (currentSet < 3) currentSet++ else onFinishWorkoutClick()
+            })
         }
     }
 }
@@ -483,11 +490,14 @@ fun ExerciseDetailsScreen(
     onBackToWorkoutClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
+    val bench = exerciseId == SampleIds.EXERCISE_BENCH
     VoraScreen(modifier = modifier) {
-        VoraAppBar("Exercise Guide", onBackClick, trailing = { VoraIconButton("?", onClick = {}, size = 36.dp) })
+        DemoDialogHost(demo)
+        VoraAppBar("Exercise Guide", onBackClick, trailing = { VoraIconButton("?", onClick = { demo.show("Guía de ejercicio de demostración: técnica y músculos objetivo.") }, size = 36.dp) })
         Column {
-            VoraTitle("Seated Cable Row")
-            Text("Target: Lats, Mid-Back, Rhomboids", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            VoraTitle(if (bench) "Bench Press" else "Seated Cable Row")
+            Text(if (bench) "Target: Chest, Front Delts, Triceps" else "Target: Lats, Mid-Back, Rhomboids", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         }
         // Foto del ejercicio (en Figma es una imagen): bloque provisorio.
         Box(
@@ -496,18 +506,24 @@ fun ExerciseDetailsScreen(
         ) { Text("🏋", fontSize = 48.sp) }
         Text("Performance Steps", style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(
+            (if (bench) listOf(
+                "1. Lie flat with your feet planted and shoulder blades pinched.",
+                "2. Unrack the bar and hold it over your mid-chest.",
+                "3. Lower the bar under control to your chest.",
+                "4. Press up and slightly back until your arms are straight.",
+                "5. Re-rack the bar only when the set is finished.",
+            ) else listOf(
                 "1. Sit upright with your chest lifted.",
                 "2. Pull the handle toward your lower torso.",
                 "3. Keep your elbows tucked close to your ribs.",
                 "4. Pause briefly during peak contraction.",
                 "5. Return the weight slowly to start.",
-            ).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            )).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         VoraCard {
             VoraOverline("Pro form cues", color = VoraGreen)
-            Text("• Keep your shoulders rolled down and back.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
-            Text("• Do not lean backward to swing the load.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (bench) "• Keep your wrists stacked over your elbows." else "• Keep your shoulders rolled down and back.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+            Text(if (bench) "• Do not bounce the bar off your chest." else "• Do not lean backward to swing the load.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         VoraTipCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -567,3 +583,39 @@ private fun CompleteStat(value: String, label: String) {
         Text(label, fontSize = 10.sp, color = VoraTextMuted, modifier = Modifier.padding(top = 2.dp))
     }
 }
+
+
+/** Datos de ejemplo por entrenamiento (NAV04): el id de la ruta decide que detalle se muestra. */
+private data class DemoWorkout(
+    val title: String,
+    val minutes: Int,
+    val level: String,
+    val focus: String,
+    val exercises: List<Triple<String, String, String>>,
+)
+
+private fun demoWorkout(workoutId: String): DemoWorkout =
+    if (workoutId == SampleIds.WORKOUT_LOWER) {
+        DemoWorkout(
+            "Lower Body Strength", 45, "Moderate", "Quads • Glutes • Hamstrings • Calves",
+            listOf(
+                Triple("01", "Back Squat", "4 × 8 • Rest 120s"),
+                Triple("02", "Romanian Deadlift", "3 × 10 • Rest 90s"),
+                Triple("03", "Leg Press", "3 × 12 • Rest 90s"),
+                Triple("04", "Walking Lunge", "3 × 12 • Rest 75s"),
+                Triple("05", "Leg Curl", "3 × 12 • Rest 60s"),
+                Triple("06", "Standing Calf Raise", "3 × 15 • Rest 45s"),
+            ),
+        )
+    } else {
+        DemoWorkout(
+            "Upper Body Strength", 42, "Moderate", "Chest • Back • Shoulders • Arms",
+            listOf(
+                Triple("01", "Bench Press", "3 × 10 • Rest 90s"),
+                Triple("02", "Seated Cable Row", "3 × 12 • Rest 75s"),
+                Triple("03", "Shoulder Press", "3 × 10 • Rest 75s"),
+                Triple("04", "Dumbbell Lateral Raise", "3 × 12 • Rest 60s"),
+                Triple("05", "Tricep Pushdown", "3 × 12 • Rest 60s"),
+            ),
+        )
+    }

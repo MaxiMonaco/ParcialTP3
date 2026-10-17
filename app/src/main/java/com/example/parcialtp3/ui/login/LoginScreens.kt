@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.parcialtp3.shared.DemoDialogHost
+import com.example.parcialtp3.shared.rememberDemoDialog
 import com.example.parcialtp3.shared.VoraCard
 import com.example.parcialtp3.shared.VoraChip
 import com.example.parcialtp3.shared.VoraIconButton
@@ -76,11 +78,11 @@ private fun LoginHeader(subtitle: String?) {
 }
 
 @Composable
-private fun SocialRow() {
+private fun SocialRow(onClick: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        VoraChip("Apple", modifier = Modifier.weight(1f), center = true)
-        VoraChip("Google", modifier = Modifier.weight(1f), center = true)
-        VoraChip("Face ID", modifier = Modifier.weight(1f), center = true)
+        VoraChip("Apple", onClick = onClick, modifier = Modifier.weight(1f), center = true)
+        VoraChip("Google", onClick = onClick, modifier = Modifier.weight(1f), center = true)
+        VoraChip("Face ID", onClick = onClick, modifier = Modifier.weight(1f), center = true)
     }
 }
 
@@ -91,10 +93,12 @@ fun SignInScreen(
     onSignUpClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
     VoraSoftBackground(modifier) {
+        DemoDialogHost(demo)
         VoraScreen(background = androidx.compose.ui.graphics.Color.Transparent) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                VoraChip("EN ⌄")
+                VoraChip("EN ⌄", onClick = { demo.show("El idioma es solo inglés en esta versión de demostración.") })
             }
             LoginHeader("Your strength, nutrition, and progress plan in one place.")
             VoraCard {
@@ -102,7 +106,7 @@ fun SignInScreen(
                     VoraTextField("Email Address", "alex.morgan@email.com", leading = "✉", filled = true)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Password", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        VoraTextLink("Forgot your password?", onClick = {})
+                        VoraTextLink("Forgot your password?", onClick = { demo.show("Recuperar la contraseña no está disponible: el acceso es una demostración sin Firebase.") })
                     }
                     VoraTextField("", "••••••••••", leading = "🔑", trailing = "👁", filled = true)
                     VoraLimeButton("Sign In  →", onSignInClick)
@@ -113,7 +117,7 @@ fun SignInScreen(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    SocialRow()
+                    SocialRow(onSignInClick)
                 }
             }
             Text(
@@ -139,12 +143,14 @@ fun SignUpScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
     VoraSoftBackground(modifier) {
+        DemoDialogHost(demo)
         VoraScreen(background = androidx.compose.ui.graphics.Color.Transparent) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 VoraIconButton("←", onBackClick, size = 40.dp)
                 Spacer(Modifier.weight(1f))
-                VoraChip("EN ⌄")
+                VoraChip("EN ⌄", onClick = { demo.show("El idioma es solo inglés en esta versión de demostración.") })
             }
             LoginHeader(null)
             VoraCard {
@@ -154,7 +160,7 @@ fun SignUpScreen(
                     VoraTextField("Password", "At least 8 characters", leading = "🔒", trailing = "👁")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("✔ 8+ secure characters", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                        VoraTextLink("Password help?", onClick = {})
+                        VoraTextLink("Password help?", onClick = { demo.show("La contraseña debe tener al menos 8 caracteres. No se valida en la demostración.") })
                     }
                     VoraLimeButton("Sign Up  →", onSignUpClick)
                     Text(
@@ -164,7 +170,7 @@ fun SignUpScreen(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    SocialRow()
+                    SocialRow(onSignUpClick)
                 }
             }
             Text(
@@ -175,7 +181,7 @@ fun SignUpScreen(
             )
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 Text("Having account issues? ", style = MaterialTheme.typography.bodyMedium)
-                VoraTextLink("Recover", onClick = {})
+                VoraTextLink("Recover", onClick = { demo.show("La recuperación de cuenta no está disponible en la demostración.") })
             }
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                 Text("Already have an account? ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

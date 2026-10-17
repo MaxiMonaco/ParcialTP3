@@ -309,13 +309,15 @@ fun VoraIconButton(icon: String, onClick: () -> Unit, modifier: Modifier = Modif
 /** Orbe verde del coach (circulo con degradado simple). */
 @Composable
 fun VoraOrb(modifier: Modifier = Modifier, size: Dp = 28.dp) {
+    // El degradado no depende de nada: se crea una sola vez en vez de en cada recomposicion.
+    val brush = androidx.compose.runtime.remember {
+        androidx.compose.ui.graphics.Brush.radialGradient(listOf(VoraMint, Color(0xFF1F6B57), VoraGreen))
+    }
     Box(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(
-                androidx.compose.ui.graphics.Brush.radialGradient(listOf(VoraMint, Color(0xFF1F6B57), VoraGreen)),
-            ),
+            .background(brush),
     )
 }
 
@@ -360,15 +362,14 @@ fun VoraTextField(
 /** Fondo con degradado menta suave arriba, como en Login. */
 @Composable
 fun VoraSoftBackground(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val bg = MaterialTheme.colorScheme.background
+    val brush = androidx.compose.runtime.remember(bg) {
+        androidx.compose.ui.graphics.Brush.verticalGradient(listOf(VoraMintTint, bg), endY = 900f)
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(VoraMintTint, MaterialTheme.colorScheme.background),
-                    endY = 900f,
-                ),
-            ),
+            .background(brush),
     ) { content() }
 }
 
@@ -471,5 +472,36 @@ fun VoraMicButton(onClick: () -> Unit, modifier: Modifier = Modifier, mint: Bool
         Box(contentAlignment = Alignment.Center) {
             Text("🎙", fontSize = (size.value * 0.34f).sp)
         }
+    }
+}
+
+/**
+ * Dialogo de demostracion: los controles que Figma muestra pero que no tienen pantalla propia
+ * (editar, duplicar, ayuda, ajustes...) abren este aviso en vez de quedar sin respuesta (NAV03).
+ */
+class DemoDialogState {
+    var message: String? by androidx.compose.runtime.mutableStateOf(null)
+    fun show(text: String) { message = text }
+}
+
+@Composable
+fun rememberDemoDialog(): DemoDialogState = androidx.compose.runtime.remember { DemoDialogState() }
+
+@Composable
+fun DemoDialogHost(state: DemoDialogState, title: String = "Demostración") {
+    val text = state.message
+    if (text != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { state.message = null },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { state.message = null }) {
+                    Text("OK", color = VoraGreen, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            title = { Text(title, style = MaterialTheme.typography.titleMedium) },
+            text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(20.dp),
+        )
     }
 }

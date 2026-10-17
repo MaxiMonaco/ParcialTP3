@@ -1,0 +1,9 @@
+# Reglas de R8 para el build de release.
+# Gson y Retrofit leen los campos de los DTO por reflexion: sin esto R8 les cambia el nombre
+# y el JSON de la API deja de mapearse. Los DTO nuevos deben ir en data/remote o model.
+-keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod
+-keep class com.example.parcialtp3.data.remote.** { *; }
+-keep class com.example.parcialtp3.data.model.** { *; }
+-keep class com.example.parcialtp3.model.** { *; }
+# Retrofit usa las interfaces de la API por reflexion
+-keep,allowobfuscation interface com.example.parcialtp3.data.remote.**

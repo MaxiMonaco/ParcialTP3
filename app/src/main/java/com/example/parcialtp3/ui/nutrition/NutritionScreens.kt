@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import com.example.parcialtp3.navigation.SampleIds
 import com.example.parcialtp3.shared.VoraAppBar
 import com.example.parcialtp3.shared.VoraBigOrb
+import com.example.parcialtp3.shared.DemoDialogHost
+import com.example.parcialtp3.shared.rememberDemoDialog
 import com.example.parcialtp3.shared.VoraCard
 import com.example.parcialtp3.shared.VoraDarkCard
 import com.example.parcialtp3.shared.VoraDarkPanel
@@ -275,7 +277,9 @@ fun AddFoodScreen(
     onLogManuallyClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
+        DemoDialogHost(demo)
         VoraAppBar("Add Food", onBackClick)
         VoraDarkPanel {
             Row {
@@ -288,8 +292,8 @@ fun AddFoodScreen(
             VoraLimeButton("🎙  Start Voice Logging", onStartVoiceLoggingClick)
         }
         MethodCard("📷", "Snap a Photo", "Vora estimates sizes and nutrition info.", onSnapPhotoClick)
-        // "Search Database" no tiene destino en Figma: es solo visual.
-        MethodCard("🔍", "Search Database", "Search millions of local & global food items.", onClick = {})
+        // "Search Database" no tiene destino en Figma: abre un aviso de demostración.
+        MethodCard("🔍", "Search Database", "Search millions of local & global food items.", onClick = { demo.show("La búsqueda en base de datos de alimentos no está incluida en esta versión.") })
         MethodCard("✏", "Log Manually", "Input weight, calories and macros yourself.", onLogManuallyClick)
     }
 }
@@ -472,7 +476,9 @@ fun FoodConfirmationScreen(
     onSaveWithoutLoggingClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
+        DemoDialogHost(demo)
         VoraAppBar("Review Meal", onBackClick)
         listOf(
             Triple("Grilled Chicken Breast", "180g", "280 kcal"),
@@ -494,7 +500,7 @@ fun FoodConfirmationScreen(
                 }
             }
         }
-        VoraTextLink("+ Add Ingredient", onClick = {})
+        VoraTextLink("+ Add Ingredient", onClick = { demo.show("Agregar ingredientes es parte de la carga manual (Log Manually).") })
         Surface(shape = RoundedCornerShape(20.dp), color = VoraGreen, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 Row {
@@ -524,24 +530,23 @@ fun MealDetailsScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val title = when (mealId) {
-        SampleIds.MEAL_BREAKFAST -> "Breakfast"
-        SampleIds.MEAL_SNACK -> "Snack"
-        else -> "Lunch"
-    }
+    val meal = demoMeal(mealId)
+    val title = meal.title
+    val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
-        VoraAppBar(title, onBackClick, trailing = { Text("13:12", color = VoraTextMuted, fontSize = 13.sp) })
+        DemoDialogHost(demo)
+        VoraAppBar(title, onBackClick, trailing = { Text(meal.time, color = VoraTextMuted, fontSize = 13.sp) })
         VoraCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     VoraOverline("Total calories")
-                    Text("520 kcal", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                    Text("${meal.kcal} kcal", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
                 }
-                VoraRing(0.75f, "", size = 56.dp)
+                VoraRing(meal.ring, "", size = 56.dp)
             }
             Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(VoraBorder))
             Row {
-                listOf("PROTEIN" to "38g", "CARBS" to "54g", "FAT" to "14g").forEachIndexed { i, (l, v) ->
+                listOf("PROTEIN" to meal.protein, "CARBS" to meal.carbs, "FAT" to meal.fat).forEachIndexed { i, (l, v) ->
                     Column(modifier = Modifier.weight(1f), horizontalAlignment = if (i == 0) Alignment.Start else if (i == 1) Alignment.CenterHorizontally else Alignment.End) {
                         VoraOverline(l)
                         Text(v, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
@@ -556,11 +561,7 @@ fun MealDetailsScreen(
             }
         }
         VoraSectionTitle("Ingredients")
-        listOf(
-            Triple("Grilled Chicken Breast", "180g", "280 kcal"),
-            Triple("Basmati Rice", "150g", "190 kcal"),
-            Triple("Mixed Steamed Vegetables", "100g", "50 kcal"),
-        ).forEach { (name, grams, kcal) ->
+        meal.items.forEach { (name, grams, kcal) ->
             VoraCard(contentPadding = 14.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -572,7 +573,47 @@ fun MealDetailsScreen(
             }
         }
         // Editar / duplicar son solo visuales.
-        VoraOutlinedButton("Edit Meal", onClick = {})
-        VoraOutlinedButton("Duplicate Meal", onClick = {})
+        VoraOutlinedButton("Edit Meal", onClick = { demo.show("Editar comidas no está incluido: solo se pueden cargar y eliminar.") })
+        VoraOutlinedButton("Duplicate Meal", onClick = { demo.show("Duplicar comidas no está incluido en esta versión.") })
     }
+}
+
+
+/** Datos de ejemplo por comida (NAV04): el id de la ruta decide que detalle se muestra. */
+private data class DemoMeal(
+    val title: String,
+    val time: String,
+    val kcal: Int,
+    val ring: Float,
+    val protein: String,
+    val carbs: String,
+    val fat: String,
+    val items: List<Triple<String, String, String>>,
+)
+
+private fun demoMeal(mealId: String): DemoMeal = when (mealId) {
+    SampleIds.MEAL_BREAKFAST -> DemoMeal(
+        "Breakfast", "08:05", 410, 0.55f, "24g", "46g", "14g",
+        listOf(
+            Triple("Greek Yogurt", "200g", "130 kcal"),
+            Triple("Rolled Oats", "50g", "190 kcal"),
+            Triple("Blueberries", "80g", "45 kcal"),
+            Triple("Honey", "15g", "45 kcal"),
+        ),
+    )
+    SampleIds.MEAL_SNACK -> DemoMeal(
+        "Snack", "16:30", 180, 0.25f, "6g", "20g", "9g",
+        listOf(
+            Triple("Almonds", "20g", "120 kcal"),
+            Triple("Apple", "150g", "60 kcal"),
+        ),
+    )
+    else -> DemoMeal(
+        "Lunch", "13:12", 520, 0.75f, "38g", "54g", "14g",
+        listOf(
+            Triple("Grilled Chicken Breast", "180g", "280 kcal"),
+            Triple("Basmati Rice", "150g", "190 kcal"),
+            Triple("Mixed Steamed Vegetables", "100g", "50 kcal"),
+        ),
+    )
 }

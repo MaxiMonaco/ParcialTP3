@@ -43,8 +43,10 @@ android {
 
     buildTypes {
         release {
+            // R8: reduce y ofusca el codigo y quita recursos sin uso (APK mas chico y rapido).
+            // Las reglas para no romper Gson/Retrofit estan en app/src/main/keepRules/app-rules.keep
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
@@ -87,9 +89,8 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
 
-    // Firebase Auth
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
+    // Firebase Auth: se quito porque el acceso de VORA es una demostracion sin autenticacion real.
+    // Para volver a usarlo: implementation(platform(libs.firebase.bom)) y implementation(libs.firebase.auth)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

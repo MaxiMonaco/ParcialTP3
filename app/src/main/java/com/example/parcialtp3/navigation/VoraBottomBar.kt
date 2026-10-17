@@ -1,8 +1,11 @@
 package com.example.parcialtp3.navigation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -12,19 +15,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.parcialtp3.R
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 
-/** Las 5 pestanas de Figma. El "icon" es un emoji provisorio hasta tener los iconos reales. */
-enum class BottomTab(val flow: AppDestination, val label: String, val icon: String) {
-    Home(AppDestination.HomeFlow, "Home", "🏠"),
-    Workout(AppDestination.WorkoutFlow, "Workout", "🏋"),
-    Nutrition(AppDestination.NutritionFlow, "Nutrition", "🍎"),
-    Progress(AppDestination.ProgressFlow, "Progress", "📈"),
-    Profile(AppDestination.ProfileFlow, "Profile", "👤"),
+/** Las 5 pestanas de Figma. El icono es un vector en res/drawable (se tiñe segun la pestana activa). */
+enum class BottomTab(val flow: AppDestination, val label: String, @DrawableRes val icon: Int) {
+    Home(AppDestination.HomeFlow, "Home", R.drawable.ic_home),
+    Workout(AppDestination.WorkoutFlow, "Workout", R.drawable.ic_workout),
+    Nutrition(AppDestination.NutritionFlow, "Nutrition", R.drawable.ic_nutrition),
+    Progress(AppDestination.ProgressFlow, "Progress", R.drawable.ic_progress),
+    Profile(AppDestination.ProfileFlow, "Profile", R.drawable.ic_profile),
 }
 
 /**
@@ -55,7 +60,7 @@ fun VoraBottomBar(
                 NavigationBarItem(
                     selected = selected,
                     onClick = { onTabClick(tab) },
-                    icon = { Text(tab.icon, modifier = Modifier.alpha(if (selected) 1f else 0.45f)) },
+                    icon = { Icon(painterResource(tab.icon), contentDescription = tab.label, modifier = Modifier.size(24.dp).alpha(if (selected) 1f else 0.6f)) },
                     label = {
                         Text(
                             text = tab.label,
