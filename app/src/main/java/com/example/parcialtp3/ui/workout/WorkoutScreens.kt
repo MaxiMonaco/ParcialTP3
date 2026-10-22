@@ -36,7 +36,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.parcialtp3.navigation.SampleIds
+import com.example.parcialtp3.viewmodel.WorkoutsViewModel
+import com.example.parcialtp3.viewmodel.WorkoutsUiState
+import com.example.parcialtp3.viewmodel.WorkoutDetailViewModel
+import com.example.parcialtp3.viewmodel.WorkoutDetailUiState
+import com.example.parcialtp3.viewmodel.ExerciseViewModel
+import com.example.parcialtp3.viewmodel.ExerciseUiState
+import com.example.parcialtp3.shared.VoraWarningBlock
+import com.example.parcialtp3.shared.VoraSectionTitle
+import com.example.parcialtp3.shared.VoraLoadingBlock
+import com.example.parcialtp3.shared.VoraErrorBlock
+import com.example.parcialtp3.shared.VoraEmptyBlock
+import com.example.parcialtp3.model.WorkoutDetail
+import com.example.parcialtp3.model.Workout
+import com.example.parcialtp3.model.Exercise
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.CircularProgressIndicator
 import com.example.parcialtp3.shared.VoraAppBar
 import com.example.parcialtp3.shared.VoraBigOrb
 import com.example.parcialtp3.shared.DemoDialogHost
@@ -65,8 +81,11 @@ import com.example.parcialtp3.ui.theme.VoraMintTint
 import com.example.parcialtp3.ui.theme.VoraTextMuted
 
 /*
- * Workout Flow (solo visual, datos de ejemplo de Figma). El id del entrenamiento o ejercicio llega
- * por parametro (NAV04) pero todavia no se usa para cargar datos: eso lo hara quien integre la API.
+ * Workout Flow. Catalogo, detalle, preparacion, sesion activa y guia de ejercicio leen de un
+ * ViewModel (Hilt) que combina Retrofit + cache en Room (RF01, RF02, RF05, RF07). Cada pantalla
+ * sigue recibiendo solo lambdas de navegacion: el ViewModel se pide con hiltViewModel() y toma el
+ * id del entrenamiento o ejercicio de los argumentos de la ruta (NAV04).
+ * Plan semanal, coach, cronometro y volumen siguen siendo de demostracion.
  */
 
 private val DarkText = Color.White
@@ -85,7 +104,7 @@ private fun CoachLabel(text: String, color: Color = MaterialTheme.colorScheme.on
     }
 }
 
-/** Workout / 01 — Dashboard. */
+/** Workout / 01 — Dashboard. Catalogo remoto (Retrofit) con cache en Room: RF01, RF02, RF05. */
 @Composable
 fun WorkoutDashboardScreen(
     onStartWorkoutClick: (workoutId: String) -> Unit,
@@ -93,7 +112,9 @@ fun WorkoutDashboardScreen(
     onWeeklyPlanClick: () -> Unit,
     onViewProgressClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: WorkoutsViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     VoraScreen(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -103,23 +124,13 @@ fun WorkoutDashboardScreen(
             VoraIconButton("📅", onWeeklyPlanClick)
         }
 
-        VoraDarkPanel {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("READY FOR TODAY?", color = VoraMint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                VoraStatusPill("MODERATE", dark = true)
-            }
-            Text("Upper Body Strength", color = DarkText, style = MaterialTheme.typography.headlineSmall)
-            Text("42 min • 5 exercises • Focus: Chest & Back", color = DarkSub, style = MaterialTheme.typography.bodyMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                VoraLimeButton("Start Workout", { onStartWorkoutClick(SampleIds.WORKOUT_UPPER) }, modifier = Modifier.weight(1f))
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Transparent,
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
-                    modifier = Modifier.clip(CircleShape).clickable { onWorkoutDetailsClick(SampleIds.WORKOUT_UPPER) },
-                ) {
-                    Text("Details", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp))
-                }
+        when (val current = state) {
+            is WorkoutsUiState.Loading -> VoraLoadingBlock()
+            is WorkoutsUiState.Error -> VoraErrorBlock(current.message, onRetry = viewModel::retry)
+            is WorkoutsUiState.Empty -> VoraEmptyBlock("No hay entrenamientos disponibles por ahora.", onRetry = viewModel::retry)
+            is WorkoutsUiState.Content -> {
+                current.warning?.let { VoraWarningBlock(it, onRetry = viewModel::retry) }
+                WorkoutCatalog(current.workouts, onStartWorkoutClick, onWorkoutDetailsClick)
             }
         }
 
@@ -167,6 +178,55 @@ fun WorkoutDashboardScreen(
     }
 }
 
+/** El primer entrenamiento del catalogo va destacado; debajo se listan todos y cada uno abre SU detalle (NAV04). */
+@Composable
+private fun WorkoutCatalog(
+    workouts: List<Workout>,
+    onStartWorkoutClick: (workoutId: String) -> Unit,
+    onWorkoutDetailsClick: (workoutId: String) -> Unit,
+) {
+    val featured = workouts.first()
+    VoraDarkPanel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("READY FOR TODAY?", color = VoraMint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (featured.level.isNotBlank()) VoraStatusPill(featured.level.uppercase(), dark = true)
+        }
+        Text(featured.name, color = DarkText, style = MaterialTheme.typography.headlineSmall)
+        Text(workoutSummary(featured), color = DarkSub, style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            VoraLimeButton("Start Workout", { onStartWorkoutClick(featured.id) }, modifier = Modifier.weight(1f))
+            Surface(
+                shape = CircleShape,
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                modifier = Modifier.clip(CircleShape).clickable { onWorkoutDetailsClick(featured.id) },
+            ) {
+                Text("Details", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp))
+            }
+        }
+    }
+    VoraSectionTitle("All workouts")
+    workouts.forEach { workout ->
+        VoraCard(onClick = { onWorkoutDetailsClick(workout.id) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(workout.name, style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
+                    Text(workoutSummary(workout), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text("→", color = VoraTextMuted, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+/** "25 min • 3 exercises • Beginner": solo muestra lo que la API mando. */
+private fun workoutSummary(workout: Workout): String =
+    listOfNotNull(
+        workout.durationMinutes?.let { "$it min" },
+        workout.exerciseCount?.let { "$it exercises" },
+        workout.level.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() },
+    ).joinToString(" • ")
+
 @Composable
 private fun StatBlock(label: String, value: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -180,13 +240,18 @@ private fun VDivider() {
     Box(Modifier.padding(start = 12.dp).width(1.dp).fillMaxHeight().background(VoraBorder))
 }
 
-/** Workout / 02 — Weekly Plan. */
+/** Workout / 02 — Weekly Plan. Demostracion; los entrenamientos de hoy y del jueves salen del catalogo. */
 @Composable
 fun WeeklyPlanScreen(
     onWorkoutClick: (workoutId: String) -> Unit,
     onAskVoraClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: WorkoutsViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val workouts = (state as? WorkoutsUiState.Content)?.workouts.orEmpty()
+    val today = workouts.getOrNull(0)
+    val thursday = workouts.getOrNull(1)
     VoraScreen(modifier = modifier) {
         Column {
             VoraTitle("Your Plan")
@@ -206,12 +271,12 @@ fun WeeklyPlanScreen(
                 }
             }
         }
-        // Entrenamiento de hoy (borde verde)
+        // Entrenamiento de hoy (borde verde): el primero del catalogo
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.5.dp, VoraGreen),
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { onWorkoutClick(SampleIds.WORKOUT_UPPER) },
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable { today?.let { onWorkoutClick(it.id) } },
         ) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -220,8 +285,12 @@ fun WeeklyPlanScreen(
                         Text("READY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = VoraGreen, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                     }
                 }
-                Text("Upper Body Strength", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
-                Text("42 min • 5 exercises • Intermediate", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(today?.name ?: "Sin entrenamiento cargado", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                Text(
+                    today?.let { workoutSummary(it) } ?: "Abrí la pestaña Workout con conexión para descargar el catálogo.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         VoraCard {
@@ -234,10 +303,14 @@ fun WeeklyPlanScreen(
                 VoraOrb(size = 26.dp)
             }
         }
-        VoraCard(onClick = { onWorkoutClick(SampleIds.WORKOUT_LOWER) }) {
+        VoraCard(onClick = { thursday?.let { onWorkoutClick(it.id) } }) {
             VoraOverline("Thursday")
-            Text("Lower Body Strength", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
-            Text("45 min • 6 exercises", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(thursday?.name ?: "Rest day", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
+            Text(
+                thursday?.let { workoutSummary(it) } ?: "No workout scheduled",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         VoraDarkPanel {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -257,109 +330,179 @@ fun WeeklyPlanScreen(
     }
 }
 
-/** Workout / 03 — Workout Details. */
+/** Workout / 03 — Workout Details. GET /v1/workouts/{id} con cache en Room (RF01, RF02, RF05). */
 @Composable
 fun WorkoutDetailsScreen(
-    workoutId: String,
+    @Suppress("UNUSED_PARAMETER") workoutId: String, // el ViewModel lo toma solo de los argumentos de la ruta
     onBackClick: () -> Unit,
     onStartWorkoutClick: () -> Unit,
     onExerciseClick: (exerciseId: String) -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: WorkoutDetailViewModel = hiltViewModel(),
 ) {
     val demo = rememberDemoDialog()
-    val workout = demoWorkout(workoutId)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     VoraScreen(modifier = modifier) {
         DemoDialogHost(demo)
         VoraAppBar("Workout Overview", onBackClick)
-        Column {
-            VoraTitle(workout.title)
-            Text("${workout.minutes} min  •  ${workout.level}  •  ${workout.exercises.size} exercises", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
-            Text("Focus: ${workout.focus}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        VoraTipCard {
-            VoraOverline("VORA Coach note", color = VoraGreen)
-            Text(
-                "Based on your last session, VORA suggests keeping the same weights and focusing on controlled repetitions today.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
-        workout.exercises.forEachIndexed { i, (n, title, sub) ->
-            val exerciseId = if (i == 0) SampleIds.EXERCISE_BENCH else SampleIds.EXERCISE_CABLE_ROW
-            VoraCard(onClick = { onExerciseClick(exerciseId) }, contentPadding = 12.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.background, modifier = Modifier.size(40.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Text(n, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = VoraGreen) }
-                    }
-                    Column(modifier = Modifier.padding(start = 12.dp)) {
-                        Text(title, style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
-                        Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        when (val current = state) {
+            is WorkoutDetailUiState.Loading -> VoraLoadingBlock()
+            is WorkoutDetailUiState.Error -> VoraErrorBlock(current.message, onRetry = viewModel::retry)
+            is WorkoutDetailUiState.Content -> {
+                val workout = current.workout
+                current.warning?.let { VoraWarningBlock(it, onRetry = viewModel::retry) }
+                Column {
+                    VoraTitle(workout.name)
+                    Text(
+                        listOfNotNull(
+                            workout.durationMinutes?.let { "$it min" },
+                            workout.level.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() },
+                            "${workout.exercises.size} exercises",
+                        ).joinToString("  •  "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                VoraTipCard {
+                    VoraOverline("VORA Coach note", color = VoraGreen)
+                    Text(
+                        "Based on your last session, VORA suggests keeping the same weights and focusing on controlled repetitions today.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                if (workout.exercises.isEmpty()) {
+                    VoraEmptyBlock("Este entrenamiento no tiene ejercicios cargados.")
+                }
+                workout.exercises.forEach { exercise ->
+                    VoraCard(onClick = { onExerciseClick(exercise.id) }, contentPadding = 12.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.background, modifier = Modifier.size(40.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("%02d".format(exercise.position + 1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = VoraGreen)
+                                }
+                            }
+                            Column(modifier = Modifier.padding(start = 12.dp)) {
+                                Text(exercise.name, style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
+                                Text(exerciseSummary(exercise), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
+                VoraPrimaryButton("Start Workout", onStartWorkoutClick)
+                VoraOutlinedButton("Edit workout", onClick = { demo.show("Editar entrenamientos no está incluido en esta versión.") })
             }
         }
-        VoraPrimaryButton("Start Workout", onStartWorkoutClick)
-        VoraOutlinedButton("Edit workout", onClick = { demo.show("Editar entrenamientos no está incluido en esta versión.") })
     }
 }
+
+/** "3 × 10 • Rest 90s" */
+private fun exerciseSummary(exercise: Exercise): String =
+    listOfNotNull(
+        "${exercise.sets} × ${exercise.reps}",
+        exercise.restSeconds?.let { "Rest ${it}s" },
+    ).joinToString(" • ")
 
 /** Workout / 04 — Pre Workout. */
 @Composable
 fun PreWorkoutScreen(
-    workoutId: String,
+    @Suppress("UNUSED_PARAMETER") workoutId: String, // el ViewModel lo toma solo de los argumentos de la ruta
     onCloseClick: () -> Unit,
     onStartWorkoutClick: () -> Unit,
     onAskVoraClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: WorkoutDetailViewModel = hiltViewModel(),
 ) {
-    val workout = demoWorkout(workoutId)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     DarkFrame(modifier) {
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        when (val current = state) {
+            is WorkoutDetailUiState.Loading -> DarkStatus(message = null, onRetry = null, onClose = onCloseClick)
+            is WorkoutDetailUiState.Error -> DarkStatus(message = current.message, onRetry = viewModel::retry, onClose = onCloseClick)
+            is WorkoutDetailUiState.Content -> PreWorkoutContent(current.workout, onCloseClick, onStartWorkoutClick, onAskVoraClick)
+        }
+    }
+}
+
+@Composable
+private fun PreWorkoutContent(
+    workout: WorkoutDetail,
+    onCloseClick: () -> Unit,
+    onStartWorkoutClick: () -> Unit,
+    onAskVoraClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("GET READY", color = VoraMint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("✕", color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable(onClick = onCloseClick).padding(8.dp))
+        }
+        Column {
+            Text(workout.name, color = Color.White, style = MaterialTheme.typography.headlineMedium)
+            Text(
+                listOfNotNull(workout.durationMinutes?.let { "$it min" }, "${workout.exercises.size} exercises").joinToString(" • "),
+                color = VoraMint,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        PreCard("TODAY'S FOCUS", "Controlled Repetitions", "Keep concentric lifts explosive and focus on a slow, 2-second eccentric return for maximal hypertrophy stimulus.")
+        PreCard("YOUR LAST SESSION", "Bench Press Volume", "Set 1: 40 kg × 10 • Set 2: 40 kg × 9 • Set 3: 37.5 kg × 10")
+        VoraDarkCard {
+            Text("VORA'S COACH TIP", color = VoraLime, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "\"Start slightly lighter on your first set. If your form feels exceptionally robust, increase the load.\"",
+                color = VoraMint,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White.copy(alpha = 0.1f),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onAskVoraClick),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("GET READY", color = VoraMint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("✕", color = Color.White, fontSize = 16.sp, modifier = Modifier.clickable(onClick = onCloseClick).padding(8.dp))
-            }
-            Column {
-                Text(workout.title, color = Color.White, style = MaterialTheme.typography.headlineMedium)
-                Text("${workout.minutes} min • ${workout.exercises.size} exercises", color = VoraMint, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
-            }
-            PreCard("TODAY'S FOCUS", "Controlled Repetitions", "Keep concentric lifts explosive and focus on a slow, 2-second eccentric return for maximal hypertrophy stimulus.")
-            PreCard("YOUR LAST SESSION", "Bench Press Volume", "Set 1: 40 kg × 10 • Set 2: 40 kg × 9 • Set 3: 37.5 kg × 10")
-            VoraDarkCard {
-                Text("VORA'S COACH TIP", color = VoraLime, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "\"Start slightly lighter on your first set. If your form feels exceptionally robust, increase the load.\"",
-                    color = VoraMint,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color.White.copy(alpha = 0.1f),
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onAskVoraClick),
-            ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    VoraOrb(size = 28.dp)
-                    Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                        Text("Need anything?", color = VoraMint, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("\"Recommend a chest warm-up\"", color = DarkSub, fontSize = 12.sp)
-                    }
-                    Surface(shape = CircleShape, color = VoraLime, modifier = Modifier.size(40.dp)) {
-                        Box(contentAlignment = Alignment.Center) { Text("🎙", fontSize = 16.sp) }
-                    }
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                VoraOrb(size = 28.dp)
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text("Need anything?", color = VoraMint, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text("\"Recommend a chest warm-up\"", color = DarkSub, fontSize = 12.sp)
+                }
+                Surface(shape = CircleShape, color = VoraLime, modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Text("🎙", fontSize = 16.sp) }
                 }
             }
-            Surface(
-                shape = CircleShape,
-                color = VoraMint,
-                modifier = Modifier.fillMaxWidth().clip(CircleShape).clickable(onClick = onStartWorkoutClick),
-            ) {
-                Text("Start Workout", color = VoraGreen, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 16.dp))
-            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = VoraMint,
+            modifier = Modifier.fillMaxWidth().clip(CircleShape).clickable(onClick = onStartWorkoutClick),
+        ) {
+            Text("Start Workout", color = VoraGreen, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 16.dp))
+        }
+    }
+}
+
+/** Carga (message == null) o error sobre fondo oscuro. `onClose` es null donde no hay a donde cerrar. */
+@Composable
+private fun DarkStatus(message: String?, onRetry: (() -> Unit)?, onClose: (() -> Unit)?) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (message == null) {
+            CircularProgressIndicator(color = VoraMint)
+        } else {
+            Text(message, color = Color.White, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(16.dp))
+            if (onRetry != null) VoraLimeButton("Reintentar", onRetry)
+        }
+        if (onClose != null) {
+            Spacer(Modifier.height(12.dp))
+            VoraTextLink("Cerrar", onClose, muted = true)
         }
     }
 }
@@ -373,88 +516,119 @@ private fun PreCard(label: String, title: String, body: String) {
     }
 }
 
-/** Workout / 05 — Active Workout. */
+/** Workout / 05 — Active Workout. Ejercicios reales; cronometro, descanso y volumen simulados. */
 @Composable
 fun ActiveWorkoutScreen(
-    workoutId: String,
+    @Suppress("UNUSED_PARAMETER") workoutId: String, // el ViewModel lo toma solo de los argumentos de la ruta
     onFinishWorkoutClick: () -> Unit,
     onExerciseGuideClick: (exerciseId: String) -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: WorkoutDetailViewModel = hiltViewModel(),
 ) {
-    // Serie actual (estado local, no se guarda): Complete Set avanza y en la última termina el entrenamiento.
-    var currentSet by remember { mutableIntStateOf(2) }
-    val totalExercises = demoWorkout(workoutId).exercises.size
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     DarkFrame(modifier) {
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f).clickable { onExerciseGuideClick(SampleIds.EXERCISE_CABLE_ROW) }) {
-                    Text("EXERCISE 2 OF $totalExercises", color = VoraMint, fontSize = 12.sp)
-                    Text("Seated Cable Row", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                }
-                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.12f), modifier = Modifier.clip(CircleShape).clickable(onClick = onFinishWorkoutClick)) {
-                    Text("Finish Workout", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-                }
-            }
-            VoraDarkCard {
-                Text("CURRENT VOLUME WORK", color = VoraMint, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("10", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
-                        Text("REPS TARGET", color = DarkSub, fontSize = 10.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("3 × 12", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
-                        Text("SET MATRIX", color = DarkSub, fontSize = 10.sp)
-                    }
-                }
-            }
-            Surface(shape = RoundedCornerShape(16.dp), color = Color.White.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("LAST SESSION", color = DarkSub, fontSize = 11.sp)
-                        Text("45 kg × 12 reps", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    }
-                    RoundGlyph("–")
-                    Text("45 kg", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp))
-                    RoundGlyph("+")
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SetPill("1", "Set 1", done = currentSet > 1, selected = currentSet == 1, modifier = Modifier.weight(1f))
-                SetPill("2", "Set 2", done = currentSet > 2, selected = currentSet == 2, modifier = Modifier.weight(1f))
-                SetPill("3", "Set 3", selected = currentSet == 3, modifier = Modifier.weight(1f))
-            }
-            Surface(shape = RoundedCornerShape(14.dp), color = Color.White.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Resting • 01:18", color = VoraMint, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Surface(shape = CircleShape, color = Color.Transparent, border = BorderStroke(1.dp, VoraMint)) {
-                        Text("+30s", color = VoraMint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                    }
-                    Surface(shape = CircleShape, color = VoraMint, modifier = Modifier.padding(start = 8.dp)) {
-                        Text("Skip", color = VoraGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
-                    }
-                }
-            }
-            VoraDarkCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    VoraOrb(size = 18.dp)
-                    Text("VORA COACH", color = VoraMint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 8.dp))
-                    Text("Voice On", color = DarkSub, fontSize = 11.sp)
-                }
-                Text(
-                    "\"Two more reps. Keep your chest elevated, brace your core, and control the bar's return.\"",
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            VoraLimeButton(if (currentSet < 3) "Complete Set" else "Finish Workout", onClick = {
-                if (currentSet < 3) currentSet++ else onFinishWorkoutClick()
-            })
+        when (val current = state) {
+            is WorkoutDetailUiState.Loading -> DarkStatus(message = null, onRetry = null, onClose = null)
+            is WorkoutDetailUiState.Error -> DarkStatus(message = current.message, onRetry = viewModel::retry, onClose = null)
+            is WorkoutDetailUiState.Content -> ActiveWorkoutContent(current.workout, onFinishWorkoutClick, onExerciseGuideClick)
         }
+    }
+}
+
+@Composable
+private fun ActiveWorkoutContent(
+    workout: WorkoutDetail,
+    onFinishWorkoutClick: () -> Unit,
+    onExerciseGuideClick: (exerciseId: String) -> Unit,
+) {
+    // Ejercicio y serie actuales: estado local simulado (no se guarda). "Complete Set" avanza la
+    // serie, al terminar las series pasa al ejercicio siguiente y en el ultimo termina el entrenamiento.
+    var exerciseIndex by remember { mutableIntStateOf(0) }
+    var currentSet by remember { mutableIntStateOf(1) }
+    val exercises = workout.exercises
+    val exercise = exercises.getOrNull(exerciseIndex)
+    val totalSets = exercise?.sets ?: 1
+    val isLastSet = currentSet >= totalSets
+    val isLastExercise = exerciseIndex >= exercises.lastIndex
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f).clickable { exercise?.let { onExerciseGuideClick(it.id) } }) {
+                Text("EXERCISE ${exerciseIndex + 1} OF ${exercises.size}", color = VoraMint, fontSize = 12.sp)
+                Text(exercise?.name ?: "No exercises", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            }
+            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.12f), modifier = Modifier.clip(CircleShape).clickable(onClick = onFinishWorkoutClick)) {
+                Text("Finish Workout", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+            }
+        }
+        VoraDarkCard {
+            Text("CURRENT VOLUME WORK", color = VoraMint, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(exercise?.reps ?: "-", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+                    Text("REPS TARGET", color = DarkSub, fontSize = 10.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("$totalSets × ${exercise?.reps ?: "-"}", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+                    Text("SET MATRIX", color = DarkSub, fontSize = 10.sp)
+                }
+            }
+        }
+        Surface(shape = RoundedCornerShape(16.dp), color = Color.White.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("LAST SESSION", color = DarkSub, fontSize = 11.sp)
+                    Text("45 kg × 12 reps", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
+                RoundGlyph("–")
+                Text("45 kg", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp))
+                RoundGlyph("+")
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (number in 1..totalSets) {
+                SetPill("$number", "Set $number", done = currentSet > number, selected = currentSet == number, modifier = Modifier.weight(1f))
+            }
+        }
+        Surface(shape = RoundedCornerShape(14.dp), color = Color.White.copy(alpha = 0.08f), modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Resting • 01:18", color = VoraMint, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Surface(shape = CircleShape, color = Color.Transparent, border = BorderStroke(1.dp, VoraMint)) {
+                    Text("+30s", color = VoraMint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                }
+                Surface(shape = CircleShape, color = VoraMint, modifier = Modifier.padding(start = 8.dp)) {
+                    Text("Skip", color = VoraGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                }
+            }
+        }
+        VoraDarkCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                VoraOrb(size = 18.dp)
+                Text("VORA COACH", color = VoraMint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 8.dp))
+                Text("Voice On", color = DarkSub, fontSize = 11.sp)
+            }
+            Text(
+                "\"Two more reps. Keep your chest elevated, brace your core, and control the bar's return.\"",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        VoraLimeButton(
+            if (isLastSet && isLastExercise) "Finish Workout" else if (isLastSet) "Next Exercise" else "Complete Set",
+            onClick = {
+                if (!isLastSet) {
+                    currentSet++
+                } else if (!isLastExercise) {
+                    exerciseIndex++
+                    currentSet = 1
+                } else {
+                    onFinishWorkoutClick()
+                }
+            },
+        )
     }
 }
 
@@ -482,56 +656,61 @@ private fun SetPill(n: String, label: String, modifier: Modifier = Modifier, don
     }
 }
 
-/** Workout / 06 — Exercise Details. */
+/** Workout / 06 — Exercise Details. Sale de la cache de Room (se guardo al descargar el detalle del entrenamiento). */
 @Composable
 fun ExerciseDetailsScreen(
-    exerciseId: String,
+    @Suppress("UNUSED_PARAMETER") exerciseId: String, // el ViewModel lo toma solo de los argumentos de la ruta
     onBackClick: () -> Unit,
     onBackToWorkoutClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: ExerciseViewModel = hiltViewModel(),
 ) {
     val demo = rememberDemoDialog()
-    val bench = exerciseId == SampleIds.EXERCISE_BENCH
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     VoraScreen(modifier = modifier) {
         DemoDialogHost(demo)
         VoraAppBar("Exercise Guide", onBackClick, trailing = { VoraIconButton("?", onClick = { demo.show("Guía de ejercicio de demostración: técnica y músculos objetivo.") }, size = 36.dp) })
-        Column {
-            VoraTitle(if (bench) "Bench Press" else "Seated Cable Row")
-            Text(if (bench) "Target: Chest, Front Delts, Triceps" else "Target: Lats, Mid-Back, Rhomboids", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-        }
-        // Foto del ejercicio (en Figma es una imagen): bloque provisorio.
-        Box(
-            modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF2E3A37)),
-            contentAlignment = Alignment.Center,
-        ) { Text("🏋", fontSize = 48.sp) }
-        Text("Performance Steps", style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            (if (bench) listOf(
-                "1. Lie flat with your feet planted and shoulder blades pinched.",
-                "2. Unrack the bar and hold it over your mid-chest.",
-                "3. Lower the bar under control to your chest.",
-                "4. Press up and slightly back until your arms are straight.",
-                "5. Re-rack the bar only when the set is finished.",
-            ) else listOf(
-                "1. Sit upright with your chest lifted.",
-                "2. Pull the handle toward your lower torso.",
-                "3. Keep your elbows tucked close to your ribs.",
-                "4. Pause briefly during peak contraction.",
-                "5. Return the weight slowly to start.",
-            )).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        VoraCard {
-            VoraOverline("Pro form cues", color = VoraGreen)
-            Text(if (bench) "• Keep your wrists stacked over your elbows." else "• Keep your shoulders rolled down and back.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
-            Text(if (bench) "• Do not bounce the bar off your chest." else "• Do not lean backward to swing the load.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        VoraTipCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                VoraOrb(size = 22.dp)
-                Text("Ask Vora: \"Explain grip variations\"", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 10.dp))
+        when (val current = state) {
+            is ExerciseUiState.Loading -> VoraLoadingBlock()
+            is ExerciseUiState.NotFound -> {
+                VoraEmptyBlock("Esta guía no está disponible. Abrí el detalle del entrenamiento con conexión para guardarla.")
+                VoraPrimaryButton("Back to Workout", onBackToWorkoutClick)
+            }
+            is ExerciseUiState.Content -> {
+                val exercise = current.exercise
+                Column {
+                    VoraTitle(exercise.name)
+                    Text("${exercise.sets} sets × ${exercise.reps} reps", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                }
+                // Foto del ejercicio (en Figma es una imagen): bloque provisorio.
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF2E3A37)),
+                    contentAlignment = Alignment.Center,
+                ) { Text("🏋", fontSize = 48.sp) }
+                Text("Performance Steps", style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (exercise.instructions.isEmpty()) {
+                        Text("Este ejercicio no trae instrucciones.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    exercise.instructions.forEachIndexed { index, step ->
+                        Text("${index + 1}. $step", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                exercise.restSeconds?.let { rest ->
+                    VoraCard {
+                        VoraOverline("Rest between sets", color = VoraGreen)
+                        Text("$rest seconds", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                    }
+                }
+                VoraTipCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        VoraOrb(size = 22.dp)
+                        Text("Ask Vora: \"Explain grip variations\"", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 10.dp))
+                    }
+                }
+                VoraPrimaryButton("Back to Workout", onBackToWorkoutClick)
             }
         }
-        VoraPrimaryButton("Back to Workout", onBackToWorkoutClick)
     }
 }
 
@@ -583,39 +762,3 @@ private fun CompleteStat(value: String, label: String) {
         Text(label, fontSize = 10.sp, color = VoraTextMuted, modifier = Modifier.padding(top = 2.dp))
     }
 }
-
-
-/** Datos de ejemplo por entrenamiento (NAV04): el id de la ruta decide que detalle se muestra. */
-private data class DemoWorkout(
-    val title: String,
-    val minutes: Int,
-    val level: String,
-    val focus: String,
-    val exercises: List<Triple<String, String, String>>,
-)
-
-private fun demoWorkout(workoutId: String): DemoWorkout =
-    if (workoutId == SampleIds.WORKOUT_LOWER) {
-        DemoWorkout(
-            "Lower Body Strength", 45, "Moderate", "Quads • Glutes • Hamstrings • Calves",
-            listOf(
-                Triple("01", "Back Squat", "4 × 8 • Rest 120s"),
-                Triple("02", "Romanian Deadlift", "3 × 10 • Rest 90s"),
-                Triple("03", "Leg Press", "3 × 12 • Rest 90s"),
-                Triple("04", "Walking Lunge", "3 × 12 • Rest 75s"),
-                Triple("05", "Leg Curl", "3 × 12 • Rest 60s"),
-                Triple("06", "Standing Calf Raise", "3 × 15 • Rest 45s"),
-            ),
-        )
-    } else {
-        DemoWorkout(
-            "Upper Body Strength", 42, "Moderate", "Chest • Back • Shoulders • Arms",
-            listOf(
-                Triple("01", "Bench Press", "3 × 10 • Rest 90s"),
-                Triple("02", "Seated Cable Row", "3 × 12 • Rest 75s"),
-                Triple("03", "Shoulder Press", "3 × 10 • Rest 75s"),
-                Triple("04", "Dumbbell Lateral Raise", "3 × 12 • Rest 60s"),
-                Triple("05", "Tricep Pushdown", "3 × 12 • Rest 60s"),
-            ),
-        )
-    }
