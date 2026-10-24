@@ -1,5 +1,7 @@
 package com.example.parcialtp3.navigation
 
+import android.net.Uri
+
 /** Nombres de los argumentos que viajan en la ruta (los que van entre llaves). */
 object NavArgs {
     const val WORKOUT_ID = "workoutId"
@@ -45,16 +47,16 @@ sealed class AppDestination(val route: String) {
     data object WorkoutDashboard : AppDestination("workout/01_dashboard")
     data object WeeklyPlan : AppDestination("workout/02_weekly_plan")
     data object WorkoutDetails : AppDestination("workout/03_details/{${NavArgs.WORKOUT_ID}}") {
-        fun createRoute(workoutId: String) = "workout/03_details/$workoutId"
+        fun createRoute(workoutId: String) = "workout/03_details/${Uri.encode(workoutId)}"
     }
     data object PreWorkout : AppDestination("workout/04_pre/{${NavArgs.WORKOUT_ID}}") {
-        fun createRoute(workoutId: String) = "workout/04_pre/$workoutId"
+        fun createRoute(workoutId: String) = "workout/04_pre/${Uri.encode(workoutId)}"
     }
     data object ActiveWorkout : AppDestination("workout/05_active/{${NavArgs.WORKOUT_ID}}") {
-        fun createRoute(workoutId: String) = "workout/05_active/$workoutId"
+        fun createRoute(workoutId: String) = "workout/05_active/${Uri.encode(workoutId)}"
     }
     data object ExerciseDetails : AppDestination("workout/06_exercise/{${NavArgs.EXERCISE_ID}}") {
-        fun createRoute(exerciseId: String) = "workout/06_exercise/$exerciseId"
+        fun createRoute(exerciseId: String) = "workout/06_exercise/${Uri.encode(exerciseId)}"
     }
     data object WorkoutComplete : AppDestination("workout/07_complete")
 

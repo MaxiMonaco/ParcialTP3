@@ -21,6 +21,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.example.parcialtp3.viewmodel.MealsViewModel
+import com.example.parcialtp3.viewmodel.MealDetailViewModel
+import com.example.parcialtp3.viewmodel.MealDetailUiState
+import com.example.parcialtp3.viewmodel.AddMealViewModel
+import com.example.parcialtp3.shared.VoraLoadingBlock
+import com.example.parcialtp3.shared.VoraFormField
+import com.example.parcialtp3.shared.VoraEmptyBlock
+import com.example.parcialtp3.model.MealType
+import com.example.parcialtp3.model.MealDates
+import com.example.parcialtp3.model.Meal
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,7 +47,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.parcialtp3.navigation.SampleIds
 import com.example.parcialtp3.shared.VoraAppBar
 import com.example.parcialtp3.shared.VoraBigOrb
 import com.example.parcialtp3.shared.DemoDialogHost
@@ -61,11 +78,25 @@ import com.example.parcialtp3.ui.theme.VoraMintTint
 import com.example.parcialtp3.ui.theme.VoraTextMuted
 
 /*
- * Nutrition Flow (solo visual, datos de ejemplo de Figma). Sin base de datos ni IA:
- * los totales, comidas y porciones son texto fijo.
+ * Nutrition Flow. Dashboard, listado por fecha, carga manual y detalle leen y escriben en Room a
+ * traves de un ViewModel (Hilt): RF03 (carga y validacion), RF04 (listado, eliminacion con
+ * confirmacion y total diario) y RF07. Voz, foto y analisis siguen simulados: no piden permisos.
+ * Cada pantalla recibe solo lambdas de navegacion; el ViewModel se pide con hiltViewModel().
  */
 
 private val DarkSub = Color.White.copy(alpha = 0.7f)
+
+// Metas diarias de demostracion (Profile / Goals es de ejemplo): solo dan escala a anillos y barras.
+private const val CALORIE_GOAL = 2100.0
+private const val PROTEIN_GOAL = 140.0
+private const val CARBS_GOAL = 220.0
+private const val FAT_GOAL = 65.0
+
+/** 420.0 -> "420"; 12.5 -> "12.5" (con la coma decimal del idioma del telefono). */
+private fun formatAmount(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString() else "%.1f".format(value)
+
+private fun progressOf(value: Double, goal: Double): Float = (value / goal).toFloat().coerceIn(0f, 1f)
 
 @Composable
 private fun Macro(label: String, value: String, goal: String, progress: Float, color: Color, modifier: Modifier = Modifier) {
@@ -92,7 +123,7 @@ private fun MealRow(name: String, description: String, kcal: String, onClick: ()
     }
 }
 
-/** Nutrition / 01 — Dashboard. */
+/** Nutrition / 01 — Dashboard. Comidas y total del dia leidos de Room. */
 @Composable
 fun NutritionDashboardScreen(
     onTodaysMealsClick: () -> Unit,
@@ -102,11 +133,15 @@ fun NutritionDashboardScreen(
     onPhotoClick: () -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: MealsViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val totals = state.totals
+    val calorieProgress = progressOf(totals.calories, CALORIE_GOAL)
     VoraScreen(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                VoraOverline("Tuesday, 8 September")
+                VoraOverline(MealDates.pretty(state.date))
                 VoraTitle("Nutrition")
             }
             VoraIconButton("📅", onTodaysMealsClick)
@@ -115,23 +150,24 @@ fun NutritionDashboardScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     VoraOverline("Calories consumed")
-                    Text("1,420", fontSize = 34.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                    Text(formatAmount(totals.calories), fontSize = 34.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
                     Text("Goal: 2,100 kcal", style = MaterialTheme.typography.bodyMedium, color = VoraTextMuted)
                 }
-                VoraRing(0.67f, "67%", size = 84.dp)
+                VoraRing(calorieProgress, "${(calorieProgress * 100).toInt()}%", size = 84.dp)
             }
             Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(VoraBorder))
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Macro("Protein", "104g", "/140g", 104f / 140f, VoraGreen, Modifier.weight(1f))
-                Macro("Carbs", "152g", "/220g", 152f / 220f, VoraMint, Modifier.weight(1f))
-                Macro("Fat", "48g", "/65g", 48f / 65f, VoraLime, Modifier.weight(1f))
+                Macro("Protein", "${formatAmount(totals.protein)}g", "/${PROTEIN_GOAL.toInt()}g", progressOf(totals.protein, PROTEIN_GOAL), VoraGreen, Modifier.weight(1f))
+                Macro("Carbs", "${formatAmount(totals.carbs)}g", "/${CARBS_GOAL.toInt()}g", progressOf(totals.carbs, CARBS_GOAL), VoraMint, Modifier.weight(1f))
+                Macro("Fat", "${formatAmount(totals.fat)}g", "/${FAT_GOAL.toInt()}g", progressOf(totals.fat, FAT_GOAL), VoraLime, Modifier.weight(1f))
             }
         }
         VoraTipCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("✨", fontSize = 16.sp)
                 Text(
-                    "You're on track today. A protein-rich dinner would help you reach your target.",
+                    if (state.meals.isEmpty()) "Log your first meal of the day to start tracking your targets."
+                    else "Keep logging your meals to reach your daily targets.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(start = 10.dp),
                 )
@@ -141,17 +177,23 @@ fun NutritionDashboardScreen(
             VoraSectionTitle("Today's Meals", Modifier.weight(1f))
             VoraTextLink("View History", onTodaysMealsClick)
         }
-        MealRow("Breakfast", "Greek yoghurt · berries · granola", "420 kcal") { onMealClick(SampleIds.MEAL_BREAKFAST) }
-        MealRow("Lunch", "Chicken · rice · vegetables", "520 kcal") { onMealClick(SampleIds.MEAL_LUNCH) }
-        MealRow("Snack", "Protein shake", "240 kcal") { onMealClick(SampleIds.MEAL_SNACK) }
-        VoraCard(contentPadding = 16.dp) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Dinner", style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
-                    Text("Not logged yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Surface(shape = CircleShape, color = VoraGreen, modifier = Modifier.clip(CircleShape).clickable(onClick = onAddDinnerClick)) {
-                    Text("+ Add", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp))
+        when {
+            state.isLoading -> VoraLoadingBlock()
+            state.meals.isEmpty() -> VoraEmptyBlock("No hay comidas registradas hoy. Usá Add o Search para cargar la primera.")
+            else -> state.meals.forEach { meal ->
+                MealRow(meal.name, meal.type.label, "${formatAmount(meal.calories)} kcal") { onMealClick(meal.id.toString()) }
+            }
+        }
+        if (!state.isLoading && state.meals.none { it.type == MealType.DINNER }) {
+            VoraCard(contentPadding = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Dinner", style = MaterialTheme.typography.titleSmall, fontSize = 15.sp)
+                        Text("Not logged yet", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Surface(shape = CircleShape, color = VoraGreen, modifier = Modifier.clip(CircleShape).clickable(onClick = onAddDinnerClick)) {
+                        Text("+ Add", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp))
+                    }
                 }
             }
         }
@@ -188,64 +230,78 @@ private fun ActionPill(text: String, onClick: () -> Unit, modifier: Modifier = M
     }
 }
 
+/** Una tarjeta por tipo de comida del dia; cada comida abre SU detalle (NAV04). */
 @Composable
-private fun TodaysMealCard(title: String, kcal: String, items: List<Triple<String, String, String>>, onClick: () -> Unit) {
-    VoraCard(onClick = onClick) {
+private fun MealGroupCard(title: String, meals: List<Meal>, onMealClick: (mealId: String) -> Unit) {
+    VoraCard {
         Row {
             Text(title, style = MaterialTheme.typography.titleSmall, fontSize = 16.sp, modifier = Modifier.weight(1f))
-            Text(kcal, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VoraGreen)
+            Text("${formatAmount(meals.sumOf { it.calories })} kcal", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = VoraGreen)
         }
         Box(Modifier.padding(vertical = 8.dp).fillMaxWidth().height(1.dp).background(VoraBorder))
-        items.forEach { (name, grams, k) ->
-            Row(modifier = Modifier.padding(vertical = 4.dp)) {
+        meals.forEach { meal ->
+            Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onMealClick(meal.id.toString()) }.padding(vertical = 4.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                    Text(grams, style = MaterialTheme.typography.bodySmall, color = VoraTextMuted)
+                    Text(meal.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        "P ${formatAmount(meal.protein)}g • C ${formatAmount(meal.carbs)}g • F ${formatAmount(meal.fat)}g",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VoraTextMuted,
+                    )
                 }
-                Text(k, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${formatAmount(meal.calories)} kcal", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
-/** Nutrition / 02 — Today's Meals. */
+/** Nutrition / 02 — Today's Meals. Listado por fecha desde Room con selector de dia (RF04). */
 @Composable
 fun TodaysMealsScreen(
     onMealClick: (mealId: String) -> Unit,
     onAddDinnerClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: MealsViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     VoraScreen(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 VoraOverline("Timeline")
-                VoraTitle("Today's Meals")
+                VoraTitle(if (state.isToday) "Today's Meals" else "Meals")
             }
-            VoraStatusPill("1,420 kcal")
+            VoraStatusPill("${formatAmount(state.totals.calories)} kcal")
         }
-        TodaysMealCard("Breakfast", "420 kcal", listOf(
-            Triple("Greek Yoghurt (0% Fat)", "200g", "150 kcal"),
-            Triple("Fresh Blueberries", "75g", "60 kcal"),
-            Triple("Organic Honey Granola", "50g", "210 kcal"),
-        )) { onMealClick(SampleIds.MEAL_BREAKFAST) }
-        TodaysMealCard("Lunch", "520 kcal", listOf(
-            Triple("Grilled Chicken Breast", "180g", "280 kcal"),
-            Triple("Basmati Rice", "150g", "190 kcal"),
-            Triple("Mixed Steamed Vegetables", "100g", "50 kcal"),
-        )) { onMealClick(SampleIds.MEAL_LUNCH) }
-        TodaysMealCard("Snack", "240 kcal", listOf(
-            Triple("Whey Protein Shake", "350ml (water)", "240 kcal"),
-        )) { onMealClick(SampleIds.MEAL_SNACK) }
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.Transparent,
-            border = BorderStroke(1.dp, VoraBorder),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(20.dp)) {
-                Text("Dinner is not logged yet", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Surface(shape = CircleShape, color = VoraGreen, modifier = Modifier.padding(top = 12.dp).clip(CircleShape).clickable(onClick = onAddDinnerClick)) {
-                    Text("+ Add Dinner", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            VoraIconButton("‹", viewModel::previousDay, size = 36.dp)
+            Text(
+                MealDates.pretty(state.date),
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f),
+            )
+            VoraIconButton("›", viewModel::nextDay, size = 36.dp)
+        }
+        when {
+            state.isLoading -> VoraLoadingBlock()
+            state.meals.isEmpty() -> VoraEmptyBlock("No hay comidas registradas este día.")
+            else -> MealType.entries.forEach { type ->
+                val group = state.meals.filter { it.type == type }
+                if (group.isNotEmpty()) MealGroupCard(type.label, group, onMealClick)
+            }
+        }
+        if (!state.isLoading && state.meals.none { it.type == MealType.DINNER }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, VoraBorder),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(20.dp)) {
+                    Text("Dinner is not logged yet", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Surface(shape = CircleShape, color = VoraGreen, modifier = Modifier.padding(top = 12.dp).clip(CircleShape).clickable(onClick = onAddDinnerClick)) {
+                        Text("+ Add Dinner", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
+                    }
                 }
             }
         }
@@ -298,25 +354,53 @@ fun AddFoodScreen(
     }
 }
 
-/** Nutrition / 03b — Manual Food (pantalla extra: Figma no tiene frame para "Log Manually"). */
+/** Nutrition / 03b — Manual Food (pantalla extra: Figma no tiene frame para "Log Manually"). RF03. */
 @Composable
 fun ManualFoodScreen(
     onBackClick: () -> Unit,
     onSaveClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: AddMealViewModel = hiltViewModel(),
 ) {
+    val form by viewModel.form.collectAsStateWithLifecycle()
     VoraScreen(modifier = modifier) {
         VoraAppBar("Log Manually", onBackClick)
-        VoraTextField("Food name", "e.g. Grilled Chicken Breast", labelUppercase = true)
-        VoraTextField("Weight (g)", "180", labelUppercase = true)
-        VoraTextField("Calories (kcal)", "280", labelUppercase = true)
+        VoraFormField("Food name", form.name, viewModel::onNameChange, "e.g. Grilled Chicken Breast", error = form.errors.name)
+        VoraFormField("Date (YYYY-MM-DD)", form.date, viewModel::onDateChange, "2026-10-21", error = form.errors.date)
+        VoraOverline("Meal type")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MealType.entries.forEach { type ->
+                MealTypeChip(type.label, selected = form.type == type, onClick = { viewModel.onTypeChange(type) }, modifier = Modifier.weight(1f))
+            }
+        }
+        VoraFormField("Calories (kcal)", form.calories, viewModel::onCaloriesChange, "280", error = form.errors.calories, decimal = true)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            VoraTextField("Protein", "38", labelUppercase = true, modifier = Modifier.weight(1f))
-            VoraTextField("Carbs", "54", labelUppercase = true, modifier = Modifier.weight(1f))
-            VoraTextField("Fat", "14", labelUppercase = true, modifier = Modifier.weight(1f))
+            VoraFormField("Protein (g)", form.protein, viewModel::onProteinChange, "38", modifier = Modifier.weight(1f), error = form.errors.protein, decimal = true)
+            VoraFormField("Carbs (g)", form.carbs, viewModel::onCarbsChange, "54", modifier = Modifier.weight(1f), error = form.errors.carbs, decimal = true)
+            VoraFormField("Fat (g)", form.fat, viewModel::onFatChange, "14", modifier = Modifier.weight(1f), error = form.errors.fat, decimal = true)
         }
         Spacer(Modifier.height(8.dp))
-        VoraPrimaryButton("Save", onSaveClick)
+        VoraPrimaryButton("Save", { viewModel.save(onSaveClick) })
+    }
+}
+
+@Composable
+private fun MealTypeChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = CircleShape,
+        color = if (selected) VoraGreen else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, if (selected) VoraGreen else VoraBorder),
+        modifier = modifier.clip(CircleShape).clickable(onClick = onClick),
+    ) {
+        Text(
+            label,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+        )
     }
 }
 
@@ -475,6 +559,7 @@ fun FoodConfirmationScreen(
     onAddToMealClick: () -> Unit,
     onSaveWithoutLoggingClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: AddMealViewModel = hiltViewModel(),
 ) {
     val demo = rememberDemoDialog()
     VoraScreen(modifier = modifier) {
@@ -511,7 +596,8 @@ fun FoodConfirmationScreen(
                 TotalsBlock()
             }
         }
-        VoraPrimaryButton("Add to Lunch", onAddToMealClick)
+        // El analisis es simulado, pero "Add to Lunch" guarda de verdad la comida en Room.
+        VoraPrimaryButton("Add to Lunch", { viewModel.saveAnalysisDemo(onAddToMealClick) })
         VoraOutlinedButton("Save without logging", onSaveWithoutLoggingClick)
     }
 }
@@ -523,97 +609,86 @@ private fun SmallSquare(glyph: String) {
     }
 }
 
-/** Nutrition / 08 — Meal Details. */
+/** Nutrition / 08 — Meal Details. Comida leida de Room; eliminar pide confirmacion (RF04). */
 @Composable
 fun MealDetailsScreen(
-    mealId: String,
+    @Suppress("UNUSED_PARAMETER") mealId: String, // el ViewModel lo toma solo de los argumentos de la ruta
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: MealDetailViewModel = hiltViewModel(),
 ) {
-    val meal = demoMeal(mealId)
-    val title = meal.title
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val demo = rememberDemoDialog()
+    var confirmDelete by remember { mutableStateOf(false) }
     VoraScreen(modifier = modifier) {
         DemoDialogHost(demo)
-        VoraAppBar(title, onBackClick, trailing = { Text(meal.time, color = VoraTextMuted, fontSize = 13.sp) })
-        VoraCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    VoraOverline("Total calories")
-                    Text("${meal.kcal} kcal", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
-                }
-                VoraRing(meal.ring, "", size = 56.dp)
+        when (val current = state) {
+            is MealDetailUiState.Loading -> {
+                VoraAppBar("Meal", onBackClick)
+                VoraLoadingBlock()
             }
-            Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(VoraBorder))
-            Row {
-                listOf("PROTEIN" to meal.protein, "CARBS" to meal.carbs, "FAT" to meal.fat).forEachIndexed { i, (l, v) ->
-                    Column(modifier = Modifier.weight(1f), horizontalAlignment = if (i == 0) Alignment.Start else if (i == 1) Alignment.CenterHorizontally else Alignment.End) {
-                        VoraOverline(l)
-                        Text(v, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            is MealDetailUiState.NotFound -> {
+                VoraAppBar("Meal", onBackClick)
+                VoraEmptyBlock("Esta comida ya no existe.")
+            }
+            is MealDetailUiState.Content -> {
+                val meal = current.meal
+                VoraAppBar(meal.type.label, onBackClick, trailing = { Text(meal.date, color = VoraTextMuted, fontSize = 13.sp) })
+                VoraCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            VoraOverline("Total calories")
+                            Text("${formatAmount(meal.calories)} kcal", fontSize = 30.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        VoraRing(progressOf(meal.calories, CALORIE_GOAL), "", size = 56.dp)
+                    }
+                    Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(VoraBorder))
+                    Row {
+                        listOf("PROTEIN" to meal.protein, "CARBS" to meal.carbs, "FAT" to meal.fat).forEachIndexed { i, (label, grams) ->
+                            Column(modifier = Modifier.weight(1f), horizontalAlignment = if (i == 0) Alignment.Start else if (i == 1) Alignment.CenterHorizontally else Alignment.End) {
+                                VoraOverline(label)
+                                Text("${formatAmount(grams)}g", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+                            }
+                        }
                     }
                 }
-            }
-        }
-        VoraTipCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("✨", fontSize = 16.sp)
-                Text("Great protein choice. You're now 36g away from your daily protein target.", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 10.dp))
-            }
-        }
-        VoraSectionTitle("Ingredients")
-        meal.items.forEach { (name, grams, kcal) ->
-            VoraCard(contentPadding = 14.dp) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(name, style = MaterialTheme.typography.bodyLarge)
-                        Text(grams, style = MaterialTheme.typography.bodySmall, color = VoraTextMuted)
+                VoraSectionTitle("Food")
+                VoraCard(contentPadding = 14.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(meal.name, style = MaterialTheme.typography.bodyLarge)
+                            Text("${meal.type.label} • ${MealDates.pretty(meal.date)}", style = MaterialTheme.typography.bodySmall, color = VoraTextMuted)
+                        }
+                        Text("${formatAmount(meal.calories)} kcal", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(kcal, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                // Editar / duplicar son solo visuales; eliminar es real.
+                VoraOutlinedButton("Edit Meal", onClick = { demo.show("Editar comidas no está incluido: solo se pueden cargar y eliminar.") })
+                VoraOutlinedButton("Duplicate Meal", onClick = { demo.show("Duplicar comidas no está incluido en esta versión.") })
+                VoraOutlinedButton("Delete Meal", onClick = { confirmDelete = true })
+                if (confirmDelete) {
+                    AlertDialog(
+                        onDismissRequest = { confirmDelete = false },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmDelete = false
+                                viewModel.delete(onDeleted = onBackClick)
+                            }) {
+                                Text("Delete", color = VoraError, fontWeight = FontWeight.SemiBold)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { confirmDelete = false }) {
+                                Text("Cancel", color = VoraGreen)
+                            }
+                        },
+                        title = { Text("Delete meal?", style = MaterialTheme.typography.titleMedium) },
+                        text = { Text("Se eliminará \"${meal.name}\" y cambiará el total del día. Esta acción no se puede deshacer.", style = MaterialTheme.typography.bodyMedium) },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(20.dp),
+                    )
                 }
             }
         }
-        // Editar / duplicar son solo visuales.
-        VoraOutlinedButton("Edit Meal", onClick = { demo.show("Editar comidas no está incluido: solo se pueden cargar y eliminar.") })
-        VoraOutlinedButton("Duplicate Meal", onClick = { demo.show("Duplicar comidas no está incluido en esta versión.") })
     }
-}
-
-
-/** Datos de ejemplo por comida (NAV04): el id de la ruta decide que detalle se muestra. */
-private data class DemoMeal(
-    val title: String,
-    val time: String,
-    val kcal: Int,
-    val ring: Float,
-    val protein: String,
-    val carbs: String,
-    val fat: String,
-    val items: List<Triple<String, String, String>>,
-)
-
-private fun demoMeal(mealId: String): DemoMeal = when (mealId) {
-    SampleIds.MEAL_BREAKFAST -> DemoMeal(
-        "Breakfast", "08:05", 410, 0.55f, "24g", "46g", "14g",
-        listOf(
-            Triple("Greek Yogurt", "200g", "130 kcal"),
-            Triple("Rolled Oats", "50g", "190 kcal"),
-            Triple("Blueberries", "80g", "45 kcal"),
-            Triple("Honey", "15g", "45 kcal"),
-        ),
-    )
-    SampleIds.MEAL_SNACK -> DemoMeal(
-        "Snack", "16:30", 180, 0.25f, "6g", "20g", "9g",
-        listOf(
-            Triple("Almonds", "20g", "120 kcal"),
-            Triple("Apple", "150g", "60 kcal"),
-        ),
-    )
-    else -> DemoMeal(
-        "Lunch", "13:12", 520, 0.75f, "38g", "54g", "14g",
-        listOf(
-            Triple("Grilled Chicken Breast", "180g", "280 kcal"),
-            Triple("Basmati Rice", "150g", "190 kcal"),
-            Triple("Mixed Steamed Vegetables", "100g", "50 kcal"),
-        ),
-    )
 }
