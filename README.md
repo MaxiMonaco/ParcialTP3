@@ -13,7 +13,7 @@ Universidad ORT Argentina · Desarrollo de Aplicaciones Móviles · Prof. Martí
 |---|---|
 | Francisco Negri | Estructura base, navegación, inventario, tema y componentes compartidos, maquetación de las 37 pantallas |
 | Francisco _(completar apellido)_ | Retrofit y caché Room de entrenamientos, registro de comidas con Room, ViewModels e Hilt |
-| _(completar)_ | _(completar)_ |
+| Sofía Soler | Firebase Authentication (ampliación): registro, inicio de sesión, recuperación de contraseña, sesión persistente y cierre de sesión, con repositorio, módulo de Hilt y ViewModel |
 | _(completar)_ | _(completar)_ |
 
 ## Cómo ejecutar
@@ -22,9 +22,12 @@ Universidad ORT Argentina · Desarrollo de Aplicaciones Móviles · Prof. Martí
 - Abrir la carpeta del proyecto, esperar la sincronización de Gradle y ejecutar el módulo `app` (▶).
 - `local.properties` es local de cada máquina (ruta del SDK) y no se sube al repositorio.
 - Pruebas unitarias: `./gradlew test` (lógica de comidas: validación y totales, `MealLogicTest`).
+- **Firebase (opcional):** sin `app/google-services.json` la app funciona con el acceso de demostración. Para usar el
+  login real, ver la sección [Firebase](#firebase-ampliación).
 
 Versiones principales (ver `gradle/libs.versions.toml`): AGP 9.3.3 · Kotlin 2.2.10 · Compose BoM 2026.02.01 ·
-Navigation Compose 2.10.2 · Hilt 2.60.1 · Room 2.8.5 · Retrofit 3.0.0 (+ converter Gson) · compileSdk / targetSdk 37 · minSdk 24.
+Navigation Compose 2.10.2 · Hilt 2.60.1 · Room 2.8.5 · Retrofit 3.0.0 (+ converter Gson) · Firebase BoM 34.19.0 (Auth) ·
+compileSdk / targetSdk 37 · minSdk 24.
 
 ## Servidor y URL
 
@@ -49,20 +52,20 @@ Navigation Compose 2.10.2 · Hilt 2.60.1 · Room 2.8.5 · Retrofit 3.0.0 (+ conv
 | DTO → modelo → Entity y repositorios (RF06) | ✅ Hecho |
 | ViewModel con estado observable y coroutines (RF07) | ✅ Hecho |
 | Hilt: módulos, `@HiltViewModel`, repositorios por constructor (RF08) | ✅ Hecho |
-| Login de demostración (sin Firebase) | ✅ Demostración |
+| Firebase Authentication: registro, inicio y cierre de sesión, recuperación de contraseña y sesión persistente (ampliación) | ✅ Hecho (sin `google-services.json`: acceso de demostración) |
 | Coach de voz y análisis de comida (voz / foto) | 🟡 Simulado, no se piden permisos |
-| Firebase y ampliaciones | ⬜ No incluidos |
+| Perfil en Firestore y reglas de seguridad (ampliación) | ⬜ No incluidos |
 
 ## Inventario de pantallas (NAV01)
 
-Los nombres son los frames reales de Figma. **Estado:** *Funcional* = usa Retrofit y/o Room;
+Los nombres son los frames reales de Figma. **Estado:** *Funcional* = usa Retrofit, Room y/o Firebase;
 *Demostración / Simulado / Datos locales* = datos de ejemplo o estados simulados. También está en
 [`docs/INVENTARIO_PANTALLAS.md`](docs/INVENTARIO_PANTALLAS.md).
 
 | # | Flujo | Pantalla (Figma) | Ruta / destino | Estado |
 |---|---|---|---|---|
-| 1 | Login | Login - 01 SignIn | `login/01_signin` | Demostración (sin Firebase) |
-| 2 | Login | Login - 02 SignUp | `login/02_signup` | Demostración (sin Firebase) |
+| 1 | Login | Login - 01 SignIn | `login/01_signin` | Funcional: Firebase Auth (sin Firebase: demostración) |
+| 2 | Login | Login - 02 SignUp | `login/02_signup` | Funcional: Firebase Auth (sin Firebase: demostración) |
 | 3 | Home | Home / 01 — Dashboard | `home/01_dashboard` | Demostración |
 | 4 | Home | Home / 02 — Notifications | `home/02_notifications` | Demostración |
 | 5 | AI Voice | Voice / 01 — Idle | `voice/01_idle` | Simulado |
@@ -97,7 +100,7 @@ Los nombres son los frames reales de Figma. **Estado:** *Funcional* = usa Retrof
 | 34 | Profile | Profile / 03 — Goals & Preferences | `profile/03_goals_preferences` | Datos locales |
 | 35 | Profile | Profile / 04 — Nutrition Preferences | `profile/04_nutrition_preferences` | Datos locales |
 | 36 | Profile | Profile / 05 — Voice & AI Settings | `profile/05_voice_ai_settings` | Datos locales |
-| 37 | Profile | Profile / 06 — Settings | `profile/06_settings` | Datos locales |
+| 37 | Profile | Profile / 06 — Settings | `profile/06_settings` | Datos locales; *Log out* cierra la sesión de Firebase |
 | — | Nutrition | *(extra)* Nutrition / 03b — Manual | `nutrition/03b_manual_food` | Funcional: Room |
 
 Las 37 filas numeradas son los frames de Figma. La fila "extra" **no está en el diseño**: se agregó
@@ -112,6 +115,8 @@ porque "Log Manually" en *Add Food* necesita un formulario y la carga manual es 
 - Las pantallas reciben lambdas de navegación, no el `NavController`; los datos los pide cada pantalla a su ViewModel.
 - Los controles sin pantalla propia en Figma (editar, duplicar, ayuda, ajustes) abren un diálogo de demostración (NAV03).
 - Login → Home y Cerrar sesión limpian la pila de navegación; atrás desde una pestaña vuelve a Home.
+- Si hay una sesión de Firebase guardada, la app abre directamente en Home (`MainActivity` elige el `startDestination`)
+  y el login no queda en la pila.
 
 ## Arquitectura
 
@@ -122,12 +127,13 @@ app/src/main/java/com/example/parcialtp3/
 ├── ui/theme/     colores, tipografía (Manrope), formas
 ├── ui/<flujo>/   pantallas de cada flujo
 ├── viewmodel/    estado de cada pantalla (StateFlow) y eventos
+├── auth/         estado de autenticación (AuthState) y validación de los formularios de acceso
 ├── data/
 │   ├── remote/       DTO y API de Retrofit
 │   ├── local/        Entity, DAO y base de datos de Room
-│   └── repository/   coordina red y caché; único punto de acceso a los datos
+│   └── repository/   coordina red, caché y autenticación; único punto de acceso a los datos
 ├── model/        modelos de la app (+ conversiones DTO → modelo → Entity)
-└── di/           módulos de Hilt (red y base de datos)
+└── di/           módulos de Hilt (red, base de datos y Firebase)
 ```
 
 **Flujo de datos (RF06).** La pantalla observa un ViewModel; el ViewModel pide datos al repositorio; el repositorio
@@ -139,6 +145,8 @@ DTO (JSON de la API) → modelo (lo que usa la app) → Entity (fila de Room).
   muestra un aviso. Un detalle que nunca se descargó informa que no está disponible sin conexión (RF02, RF05).
 - **Nutrition:** las comidas se guardan en Room; el listado por fecha es un `Flow`, así que el listado y el total
   diario cambian solos al agregar o eliminar. Eliminar pide confirmación (RF03, RF04).
+- **Acceso:** las pantallas de login observan `AuthViewModel`, que usa la interfaz `AuthRepository`. Hilt entrega
+  `FirebaseAuthRepository` si Firebase está configurado o `DemoAuthRepository` si no. La UI nunca llama a Firebase.
 
 ## Hilt y Dagger (RF08)
 
@@ -147,23 +155,59 @@ los objetos; Hilt agrega los componentes ya definidos para Android (aplicación,
 hace falta armar el grafo a mano. En este proyecto:
 
 - `@HiltAndroidApp` (`QuoteApplication`) crea el contenedor de dependencias de la aplicación.
-- `@AndroidEntryPoint` (`MainActivity`) habilita la inyección en la actividad y en las pantallas Compose.
+- `@AndroidEntryPoint` (`MainActivity`) habilita la inyección en la actividad y en las pantallas Compose. La actividad
+  recibe el `AuthRepository` por **inyección de campo** (`@Inject lateinit var`) para decidir si abre en Login o en Home.
 - `@HiltViewModel` + `hiltViewModel()` construyen cada ViewModel; Hilt le pasa el `SavedStateHandle` con los
   argumentos de la ruta (por eso `workoutId` y `mealId` llegan solos).
 - Los **módulos** le enseñan a Hilt a construir lo que no puede crear por constructor:
   `NetworkModule` provee `OkHttpClient`, `Retrofit` y `WorkoutsApi` (Retrofit genera su implementación);
-  `DatabaseModule` provee `AppDatabase` (Room) y los DAO.
-- Los repositorios (`WorkoutsRepository`, `MealsRepository`) y los ViewModels llevan `@Inject constructor`: Hilt
-  construye todo el árbol, de la base de datos a la pantalla, y reutiliza una sola instancia (`@Singleton`) de
-  Retrofit y de la base de datos.
+  `DatabaseModule` provee `AppDatabase` (Room) y los DAO;
+  `FirebaseModule` provee `FirebaseAuth` y elige la implementación de `AuthRepository` (Firebase o demostración).
+  Usa `Provider<T>` para que `FirebaseAuthRepository` solo se construya si Firebase está configurado.
+- Los repositorios (`WorkoutsRepository`, `MealsRepository`, `FirebaseAuthRepository`, `DemoAuthRepository`) y los
+  ViewModels llevan `@Inject constructor`: Hilt construye todo el árbol, de la base de datos a la pantalla, y
+  reutiliza una sola instancia (`@Singleton`) de Retrofit, de la base de datos y del repositorio de autenticación.
+
+## Firebase (ampliación)
+
+**Qué se implementó (Authentication con email y contraseña):**
+
+- **Registro** (*Sign Up*) e **inicio de sesión** (*Sign In*) con validación de campos antes de llamar a Firebase:
+  email con formato válido, contraseña de 8 caracteres o más en el registro (lo que indica Figma) y nombre no vacío.
+- **Indicador de carga** mientras Firebase responde y **errores en español** en un Snackbar: credenciales incorrectas,
+  email ya registrado, contraseña débil, sin conexión y demasiados intentos.
+- **Recuperación de contraseña:** *Forgot your password?* (Sign In) y *Recover* (Sign Up) envían el email de reseteo
+  de Firebase al email escrito en el campo.
+- **Sesión persistente:** si el usuario no cerró sesión, al volver a abrir la app entra directo a Home.
+- **Cierre de sesión:** *Profile → Settings → Log out* cierra la sesión, limpia la pila y vuelve al login; atrás no
+  regresa a la app.
+
+**Sin Firebase configurado** (sin `app/google-services.json`), la app compila y usa `DemoAuthRepository`: se entra sin
+completar los datos, como en la versión de demostración. La pantalla de login lo indica con un texto aclaratorio.
+
+**Cómo configurarlo:**
+
+1. Crear un proyecto en [console.firebase.google.com](https://console.firebase.google.com) (Google Analytics no es necesario).
+2. Agregar una app Android con el paquete `com.example.parcialtp3` (el SHA-1 no hace falta para email y contraseña).
+3. Descargar `google-services.json` y copiarlo en la carpeta `app/`. **No se sube al repositorio** (está en `.gitignore`).
+4. En **Authentication → Método de acceso**, habilitar **Correo electrónico/contraseña**.
+5. Sincronizar Gradle y ejecutar: el plugin de Google Services se aplica solo si el archivo existe (`app/build.gradle.kts`).
+
+**Archivos:** `data/repository/AuthRepository.kt` (interfaz), `FirebaseAuthRepository.kt`, `DemoAuthRepository.kt`,
+`di/FirebaseModule.kt`, `viewmodel/AuthViewModel.kt`, `auth/AuthValidation.kt`, `shared/VoraAuthField.kt`,
+`ui/login/LoginScreens.kt` y `navigation/LoginGraph.kt`.
+
+**No incluido:** perfil en Firestore, reglas de seguridad y acceso con Apple, Google o Face ID (esos botones muestran
+un aviso de demostración).
 
 ## Funciones simuladas
 
-- **Login:** acceso de demostración, sin autenticación real ni Firebase.
+- **Login sin Firebase configurado:** acceso de demostración (ver sección Firebase).
 - **Asistente de voz y análisis de comida (voz / foto):** estados con texto de ejemplo. No se pide micrófono ni cámara.
   "Confirmar" en Food Confirmation guarda de verdad una comida de ejemplo en Room.
 - **Entrenamiento activo:** los ejercicios son los reales; el cronómetro, el descanso, el avance de series y el volumen están simulados.
-- **Plan semanal, Progreso y Perfil:** valores fijos de ejemplo.
+- **Plan semanal, Progreso y Perfil:** valores fijos de ejemplo. Home, Profile y Settings muestran el usuario de
+  ejemplo de Figma (*Alex Morgan*), no los datos de la cuenta con sesión iniciada.
 - **Controles sin servicio** (editar entrenamiento, duplicar comida, buscar en base de datos, idioma, etc.): diálogo que informa el modo demostración.
 
 ## Limitaciones conocidas
@@ -172,6 +216,7 @@ hace falta armar el grafo a mano. En este proyecto:
 - Los accesos directos de Home y Progress usan los ids `w01` / `w02` de la API (`SampleIds`); si el servidor cambia esos ids, dejan de abrir el detalle.
 - Los íconos de acciones y las fotos de ejercicios, comidas y perfil todavía no son los de Figma (emojis y bloques de color).
 - Se conserva código del proyecto anterior (frases favoritas) como referencia técnica; no se usa en VORA.
+- El nombre ingresado en *Sign Up* se valida pero no se guarda (no hay perfil en Firestore).
 
 ## Supuestos (el Figma no los define)
 
@@ -187,8 +232,12 @@ hace falta armar el grafo a mano. En este proyecto:
 
 Se usó **Claude (Anthropic)** como asistente de programación en el proyecto. Parte de Francisco Negri: estructura
 de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a
-partir de los PDF exportados, README y revisión de código. _(Cada integrante completa aquí qué parte hizo con IA y qué
-revisó y probó por su cuenta: Retrofit, Room, ViewModels e Hilt, etc.)_ Todo el código fue revisado, ejecutado y probado por el equipo.
+partir de los PDF exportados, README y revisión de código. Parte de Sofía Soler: guía paso a paso para integrar
+Firebase Authentication (repositorio con implementación de demostración, módulo de Hilt, ViewModel, conexión de las
+pantallas de acceso y sesión persistente); cada paso se implementó, compiló y probó en emulador (registro, login,
+errores, recuperación de contraseña, sesión persistente y cierre de sesión) antes de su commit.
+_(Cada integrante completa aquí qué parte hizo con IA y qué revisó y probó por su cuenta: Retrofit, Room, ViewModels e Hilt, etc.)_
+Todo el código fue revisado, ejecutado y probado por el equipo.
 
 ## Comparaciones visuales Figma vs app
 
