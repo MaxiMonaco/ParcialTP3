@@ -16,8 +16,8 @@ val apiNinjasKey: String = providers
     .map { text -> Properties().apply { load(text.reader()) }.getProperty("API_NINJAS_KEY", "") }
     .getOrElse("")
 
-// google-services.json lo entrega el docente y no se sube a git.
-// Mientras no este en app/, el proyecto compila igual (sin Firebase configurado).
+// google-services.json no se sube a git (ver README, seccion Firebase).
+// Mientras no este en app/, el proyecto compila igual y la app usa el acceso de demostracion.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
@@ -89,8 +89,12 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
 
-    // Firebase Auth: se quito porque el acceso de VORA es una demostracion sin autenticacion real.
-    // Para volver a usarlo: implementation(platform(libs.firebase.bom)) y implementation(libs.firebase.auth)
+    // Firebase (ampliacion opcional): Authentication para el login y Firestore para el perfil.
+    // platform(...) aplica el BoM: fija versiones compatibles de auth y firestore.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
