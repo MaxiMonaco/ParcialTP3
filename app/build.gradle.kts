@@ -1,20 +1,9 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
-
-// La API key vive en local.properties (que no se sube a git), en una linea:
-//   API_NINJAS_KEY=tu_key
-// Se lee con providers.fileContents para que Gradle detecte si el archivo cambia.
-val apiNinjasKey: String = providers
-    .fileContents(rootProject.layout.projectDirectory.file("local.properties"))
-    .asText
-    .map { text -> Properties().apply { load(text.reader()) }.getProperty("API_NINJAS_KEY", "") }
-    .getOrElse("")
 
 // google-services.json lo entrega el docente y no se sube a git.
 // Mientras no este en app/, el proyecto compila igual (sin Firebase configurado).
@@ -35,9 +24,6 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Genera BuildConfig.API_NINJAS_KEY para usarla desde el codigo.
-        buildConfigField("String", "API_NINJAS_KEY", "\"$apiNinjasKey\"")
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -56,7 +42,6 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true // necesario para que se genere la clase BuildConfig
     }
 }
 

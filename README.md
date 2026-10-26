@@ -146,7 +146,7 @@ Hilt es una capa de Android construida sobre **Dagger**: Dagger genera en compil
 los objetos; Hilt agrega los componentes ya definidos para Android (aplicación, actividad, ViewModel), de modo que no
 hace falta armar el grafo a mano. En este proyecto:
 
-- `@HiltAndroidApp` (`QuoteApplication`) crea el contenedor de dependencias de la aplicación.
+- `@HiltAndroidApp` (`VoraApplication`) crea el contenedor de dependencias de la aplicación.
 - `@AndroidEntryPoint` (`MainActivity`) habilita la inyección en la actividad y en las pantallas Compose.
 - `@HiltViewModel` + `hiltViewModel()` construyen cada ViewModel; Hilt le pasa el `SavedStateHandle` con los
   argumentos de la ruta (por eso `workoutId` y `mealId` llegan solos).
@@ -171,7 +171,6 @@ hace falta armar el grafo a mano. En este proyecto:
 - La base de datos usa `fallbackToDestructiveMigration()` (solo desarrollo): si cambia el esquema, Room recrea la base y se pierden las comidas guardadas.
 - Los accesos directos de Home y Progress usan los ids `w01` / `w02` de la API (`SampleIds`); si el servidor cambia esos ids, dejan de abrir el detalle.
 - Los íconos de acciones y las fotos de ejercicios, comidas y perfil todavía no son los de Figma (emojis y bloques de color).
-- Se conserva código del proyecto anterior (frases favoritas) como referencia técnica; no se usa en VORA.
 
 ## Supuestos (el Figma no los define)
 
