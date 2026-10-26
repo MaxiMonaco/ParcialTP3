@@ -5,18 +5,16 @@ Universidad ORT Argentina · Desarrollo de Aplicaciones Móviles · Prof. Martí
 
 - **Figma:** https://www.figma.com/design/1nvbbfYNYmKAevuaG28J85/Parcial-Domiciliario-7-Oct-26
 - **Entrega:** 28 de octubre de 2026 (hito 1: 21 de octubre) · etiqueta de entrega: `entrega-tp3`
-- **Video de demostración:** _(VERIFICAR: pegar el enlace cuando esté grabado)_
+- **Video de demostración:** _(pendiente: pegar el enlace)_
 
 ## Integrantes
 
 | Integrante | Parte |
 |---|---|
-| Maximiliano Monaco | Estructura base del proyecto, navegación e inventario de pantallas, tema y componentes compartidos, implementación de las 37 pantallas a partir del Figma, README |
-| Francisco Bermingham | Retrofit y caché Room de entrenamientos, registro de comidas con Room, ViewModels e Hilt, test de lógica de comidas |
+| Maximiliano Monaco | _(completar)_ |
+| Francisco Bermingham | _(completar)_ |
 | Santiago Schmale | Verificación (QA) contra la consigna, plan de pruebas y hallazgos, test unitario del repositorio, limpieza del código heredado, coordinación de la entrega |
-| Sofía _(VERIFICAR apellido)_ | Video de demostración y comparaciones visuales Figma vs app |
-
-_(VERIFICAR: en la versión anterior figuraba "Francisco Negri" como autor de la estructura base; los commits de esa parte son de Maximiliano Monaco. Si Francisco Negri integra el equipo, agregar su fila con su parte.)_
+| _(completar)_ | _(completar)_ |
 
 ## Cómo ejecutar
 
@@ -188,10 +186,10 @@ hace falta armar el grafo a mano. En este proyecto:
 
 Se usó **Claude (Anthropic)** como asistente de programación. Cada integrante declara su uso; todo el código fue revisado, ejecutado y probado por el equipo.
 
-- **Maximiliano Monaco:** estructura de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a partir de los PDF exportados, README y revisión de código.
-- **Francisco Bermingham:** _(VERIFICAR: completar qué parte de Retrofit, Room, ViewModels e Hilt se hizo con asistencia y qué se revisó y probó a mano.)_
+- **Maximiliano Monaco:** estructura de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a partir de los PDF exportados, README y revisión de código. _(revisar y ajustar)_
+- **Francisco Bermingham:** _(completar)_
 - **Santiago Schmale:** análisis del repositorio contra la consigna, redacción del plan de pruebas, test unitario `WorkoutsRepositoryTest` (dobles de prueba a mano) y limpieza del código heredado. Verificación manual de la API contra la colección Postman del docente y pruebas en dispositivo físico.
-- **Sofía _(VERIFICAR)_:** _(completar.)_
+- **_(completar)_:** _(completar)_
 
 ## Comparaciones visuales Figma vs app
 
