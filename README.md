@@ -11,9 +11,9 @@ Universidad ORT Argentina · Desarrollo de Aplicaciones Móviles · Prof. Martí
 
 | Integrante | Parte |
 |---|---|
-| Francisco Negri | Estructura base, navegación, inventario, tema y componentes compartidos, maquetación de las 37 pantallas |
-| Francisco _(completar apellido)_ | Retrofit y caché Room de entrenamientos, registro de comidas con Room, ViewModels e Hilt |
-| _(completar)_ | _(completar)_ |
+| Maximiliano Monaco | _(completar)_ |
+| Francisco Bermingham | _(completar)_ |
+| Santiago Schmale | Verificación (QA) contra la consigna, plan de pruebas y hallazgos, test unitario del repositorio, limpieza del código heredado, coordinación de la entrega |
 | _(completar)_ | _(completar)_ |
 
 ## Cómo ejecutar
@@ -146,7 +146,7 @@ Hilt es una capa de Android construida sobre **Dagger**: Dagger genera en compil
 los objetos; Hilt agrega los componentes ya definidos para Android (aplicación, actividad, ViewModel), de modo que no
 hace falta armar el grafo a mano. En este proyecto:
 
-- `@HiltAndroidApp` (`QuoteApplication`) crea el contenedor de dependencias de la aplicación.
+- `@HiltAndroidApp` (`VoraApplication`) crea el contenedor de dependencias de la aplicación.
 - `@AndroidEntryPoint` (`MainActivity`) habilita la inyección en la actividad y en las pantallas Compose.
 - `@HiltViewModel` + `hiltViewModel()` construyen cada ViewModel; Hilt le pasa el `SavedStateHandle` con los
   argumentos de la ruta (por eso `workoutId` y `mealId` llegan solos).
@@ -171,7 +171,6 @@ hace falta armar el grafo a mano. En este proyecto:
 - La base de datos usa `fallbackToDestructiveMigration()` (solo desarrollo): si cambia el esquema, Room recrea la base y se pierden las comidas guardadas.
 - Los accesos directos de Home y Progress usan los ids `w01` / `w02` de la API (`SampleIds`); si el servidor cambia esos ids, dejan de abrir el detalle.
 - Los íconos de acciones y las fotos de ejercicios, comidas y perfil todavía no son los de Figma (emojis y bloques de color).
-- Se conserva código del proyecto anterior (frases favoritas) como referencia técnica; no se usa en VORA.
 
 ## Supuestos (el Figma no los define)
 
@@ -185,11 +184,27 @@ hace falta armar el grafo a mano. En este proyecto:
 
 ## Uso de IA generativa
 
-Se usó **Claude (Anthropic)** como asistente de programación en el proyecto. Parte de Francisco Negri: estructura
-de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a
-partir de los PDF exportados, README y revisión de código. _(Cada integrante completa aquí qué parte hizo con IA y qué
-revisó y probó por su cuenta: Retrofit, Room, ViewModels e Hilt, etc.)_ Todo el código fue revisado, ejecutado y probado por el equipo.
+Se usó **Claude (Anthropic)** como asistente de programación. Cada integrante declara su uso; todo el código fue revisado, ejecutado y probado por el equipo.
+
+- **Maximiliano Monaco:** estructura de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a partir de los PDF exportados, README y revisión de código. _(revisar y ajustar)_
+- **Francisco Bermingham:** _(completar)_
+- **Santiago Schmale:** análisis del repositorio contra la consigna, redacción del plan de pruebas, test unitario `WorkoutsRepositoryTest` (dobles de prueba a mano) y limpieza del código heredado. Verificación manual de la API contra la colección Postman del docente y pruebas en dispositivo físico.
+- **_(completar)_:** _(completar)_
 
 ## Comparaciones visuales Figma vs app
 
-_(Pendiente: cinco capturas lado a lado, por ejemplo Home Dashboard, Workout Dashboard, Nutrition Dashboard, Progress Resumen del día y Profile Dashboard.)_
+Referencia: [prototipo navegable en Figma](https://www.figma.com/proto/1nvbbfYNYmKAevuaG28J85/Parcial-Domiciliario-7-Oct-26?node-id=1-673&p=f&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1).
+Capturas en `docs/comparaciones/` (Figma a la izquierda, app a la derecha).
+
+| Pantalla | Figma | App | Diferencias |
+|---|---|---|---|
+| Home / 01 — Dashboard | `docs/comparaciones/01-home-figma.png` | `docs/comparaciones/01-home-app.png` | _(pendiente)_ |
+| Workout / 01 — Dashboard | `docs/comparaciones/02-workout-figma.png` | `docs/comparaciones/02-workout-app.png` | _(pendiente)_ |
+| Nutrition / 01 — Dashboard | `docs/comparaciones/03-nutrition-figma.png` | `docs/comparaciones/03-nutrition-app.png` | _(pendiente)_ |
+| Progress / 01 — Today's Overview | `docs/comparaciones/04-progress-figma.png` | `docs/comparaciones/04-progress-app.png` | _(pendiente)_ |
+| Profile / 01 — Dashboard | `docs/comparaciones/05-profile-figma.png` | `docs/comparaciones/05-profile-app.png` | _(pendiente)_ |
+
+## Verificación (QA)
+
+Plan de pruebas trazable a los criterios de la consigna y a la demostración final: [`docs/QA-PLAN.md`](docs/QA-PLAN.md).
+Pruebas unitarias en JVM: `./gradlew :app:testDebugUnitTest` (`MealLogicTest`, `WorkoutsRepositoryTest`).

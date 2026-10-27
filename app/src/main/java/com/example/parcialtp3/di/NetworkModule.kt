@@ -1,6 +1,5 @@
 package com.example.parcialtp3.di
 
-import com.example.parcialtp3.data.remote.QuotesApi
 import com.example.parcialtp3.data.remote.WorkoutsApi
 import dagger.Module
 import dagger.Provides
@@ -31,7 +30,7 @@ object NetworkModule {
             .readTimeout(15, TimeUnit.SECONDS)
             .build()
 
-    // GsonConverterFactory convierte el JSON a los data class (QuoteDto).
+    // GsonConverterFactory convierte el JSON a los data class (WorkoutDto, ApiResponse).
     @Provides
     @Singleton
     fun provideRetrofit(client: OkHttpClient): Retrofit =
@@ -40,12 +39,6 @@ object NetworkModule {
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-
-    // Retrofit genera la implementacion de la interfaz QuotesApi.
-    @Provides
-    @Singleton
-    fun provideQuotesApi(retrofit: Retrofit): QuotesApi =
-        retrofit.create(QuotesApi::class.java)
 
     // Retrofit genera la implementacion de WorkoutsApi (catalogo y detalle de entrenamientos).
     @Provides
