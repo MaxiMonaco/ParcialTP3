@@ -1,9 +1,8 @@
 package com.example.parcialtp3.auth
 
 /**
- * Estado de autenticacion (sellado) que pide el enunciado, con sus 6 casos.
- * Lo va a exponer el ViewModel de auth y las pantallas de login, registro y
- * recuperacion lo usan para mostrar carga, errores o navegar.
+ * Estado de autenticacion (sellado) con sus 6 casos. Lo expone AuthViewModel y lo usan
+ * las pantallas de Sign In y Sign Up para mostrar carga, errores o navegar al Home.
  */
 sealed interface AuthState {
     data object Idle : AuthState                                  // Inactivo
