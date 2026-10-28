@@ -12,7 +12,7 @@ Universidad ORT Argentina · Desarrollo de Aplicaciones Móviles · Prof. Martí
 | Integrante | Parte |
 |---|---|
 | Maximiliano Monaco | _(completar)_ |
-| Francisco Bermingham | _(completar)_ |
+| Francisco Bermingham | Integracion de Retrofit y Room en las funcionalidades requeridas (workout y nutrition)|
 | Santiago Schmale | Verificación (QA) contra la consigna, plan de pruebas y hallazgos, test unitario del repositorio, limpieza del código heredado, coordinación de la entrega |
 | Sofía Soler | Firebase Authentication (ampliación): registro, inicio de sesión, recuperación de contraseña, sesión persistente y cierre de sesión, con repositorio, módulo de Hilt y ViewModel |
 
@@ -227,7 +227,7 @@ nombre ingresado en *Sign Up* se valida pero no se guarda.
 Se usó **Claude (Anthropic)** como asistente de programación. Cada integrante declara su uso; todo el código fue revisado, ejecutado y probado por el equipo.
 
 - **Maximiliano Monaco:** estructura de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a partir de los PDF exportados, README y revisión de código. _(revisar y ajustar)_
-- **Francisco Bermingham:** _(completar)_
+- **Francisco Bermingham:** guia para la integracion de funcionalidades con retrofit y room.
 - **Santiago Schmale:** análisis del repositorio contra la consigna, redacción del plan de pruebas, test unitario `WorkoutsRepositoryTest` (dobles de prueba a mano) y limpieza del código heredado. Verificación manual de la API contra la colección Postman del docente y pruebas en dispositivo físico.
 - **Sofía Soler:** guía paso a paso para integrar Firebase Authentication (repositorio con implementación de demostración, módulo de Hilt, ViewModel, conexión de las pantallas de acceso y sesión persistente). Cada paso se implementó, compiló y probó en emulador (registro, login, errores, recuperación de contraseña, sesión persistente y cierre de sesión) antes de su commit.
 
