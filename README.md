@@ -14,7 +14,7 @@ Universidad ORT Argentina · Desarrollo de Aplicaciones Móviles · Prof. Martí
 | Maximiliano Monaco | _(completar)_ |
 | Francisco Bermingham | _(completar)_ |
 | Santiago Schmale | Verificación (QA) contra la consigna, plan de pruebas y hallazgos, test unitario del repositorio, limpieza del código heredado, coordinación de la entrega |
-| _(completar)_ | _(completar)_ |
+| Sofía Soler | Firebase Authentication (ampliación): registro, inicio de sesión, recuperación de contraseña, sesión persistente y cierre de sesión, con repositorio, módulo de Hilt y ViewModel |
 
 ## Cómo ejecutar
 
@@ -157,6 +157,46 @@ hace falta armar el grafo a mano. En este proyecto:
   construye todo el árbol, de la base de datos a la pantalla, y reutiliza una sola instancia (`@Singleton`) de
   Retrofit y de la base de datos.
 
+## Firebase (ampliación)
+
+**Qué se implementó (Authentication con email y contraseña):**
+
+- **Registro** (*Sign Up*) e **inicio de sesión** (*Sign In*) con validación de campos antes de llamar a Firebase:
+  email con formato válido, contraseña de 8 caracteres o más en el registro (lo que indica Figma) y nombre no vacío.
+- **Indicador de carga** mientras Firebase responde y **errores en español** en un Snackbar: credenciales incorrectas,
+  email ya registrado, contraseña débil, sin conexión y demasiados intentos.
+- **Recuperación de contraseña:** *Forgot your password?* (Sign In) y *Recover* (Sign Up) envían el email de reseteo
+  de Firebase al email escrito en el campo.
+- **Sesión persistente:** si el usuario no cerró sesión, al volver a abrir la app entra directo a Home
+  (`MainActivity` recibe el `AuthRepository` por inyección de campo y elige el `startDestination`).
+- **Cierre de sesión:** *Profile → Settings → Log out* cierra la sesión, limpia la pila y vuelve al login; atrás no
+  regresa a la app.
+
+**Cómo está armado:** las pantallas de login observan `AuthViewModel` (`@HiltViewModel`), que usa la interfaz
+`AuthRepository`. `FirebaseModule` (Hilt) provee `FirebaseAuth` y entrega `FirebaseAuthRepository` si Firebase está
+configurado o `DemoAuthRepository` si no; usa `Provider<T>` para que la implementación de Firebase solo se construya
+si hace falta. La UI nunca llama a Firebase.
+
+**Sin Firebase configurado** (sin `app/google-services.json`), la app compila y usa `DemoAuthRepository`: se entra sin
+completar los datos, como en la versión de demostración. La pantalla de login lo indica con un texto aclaratorio.
+
+**Cómo configurarlo:**
+
+1. Crear un proyecto en [console.firebase.google.com](https://console.firebase.google.com) (Google Analytics no es necesario).
+2. Agregar una app Android con el paquete `com.example.parcialtp3` (el SHA-1 no hace falta para email y contraseña).
+3. Descargar `google-services.json` y copiarlo en la carpeta `app/`. **No se sube al repositorio** (está en `.gitignore`).
+4. En **Authentication → Método de acceso**, habilitar **Correo electrónico/contraseña**.
+5. Sincronizar Gradle y ejecutar: el plugin de Google Services se aplica solo si el archivo existe (`app/build.gradle.kts`).
+
+**Archivos:** `auth/AuthState.kt`, `auth/AuthValidation.kt`, `data/repository/AuthRepository.kt` (interfaz),
+`FirebaseAuthRepository.kt`, `DemoAuthRepository.kt`, `di/FirebaseModule.kt`, `viewmodel/AuthViewModel.kt`,
+`shared/VoraAuthField.kt`, `ui/login/LoginScreens.kt`, `navigation/LoginGraph.kt`, `navigation/ProfileGraph.kt`
+(Log out), `navigation/AppNavHost.kt` y `MainActivity.kt` (sesión persistente).
+
+**No incluido:** perfil en Firestore, reglas de seguridad y acceso con Apple, Google o Face ID (esos botones muestran
+un aviso de demostración). Home, Profile y Settings siguen mostrando el usuario de ejemplo de Figma (*Alex Morgan*), y el
+nombre ingresado en *Sign Up* se valida pero no se guarda.
+
 ## Funciones simuladas
 
 - **Login:** acceso de demostración, sin autenticación real ni Firebase.
@@ -189,7 +229,7 @@ Se usó **Claude (Anthropic)** como asistente de programación. Cada integrante 
 - **Maximiliano Monaco:** estructura de navegación e inventario, tema y componentes a partir del sistema de diseño de Figma, maquetación de las pantallas a partir de los PDF exportados, README y revisión de código. _(revisar y ajustar)_
 - **Francisco Bermingham:** _(completar)_
 - **Santiago Schmale:** análisis del repositorio contra la consigna, redacción del plan de pruebas, test unitario `WorkoutsRepositoryTest` (dobles de prueba a mano) y limpieza del código heredado. Verificación manual de la API contra la colección Postman del docente y pruebas en dispositivo físico.
-- **_(completar)_:** _(completar)_
+- **Sofía Soler:** guía paso a paso para integrar Firebase Authentication (repositorio con implementación de demostración, módulo de Hilt, ViewModel, conexión de las pantallas de acceso y sesión persistente). Cada paso se implementó, compiló y probó en emulador (registro, login, errores, recuperación de contraseña, sesión persistente y cierre de sesión) antes de su commit.
 
 ## Comparaciones visuales Figma vs app
 

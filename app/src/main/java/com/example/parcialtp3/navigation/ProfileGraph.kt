@@ -1,5 +1,6 @@
 package com.example.parcialtp3.navigation
 
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -10,10 +11,11 @@ import com.example.parcialtp3.ui.profile.NutritionPreferencesScreen
 import com.example.parcialtp3.ui.profile.ProfileDashboardScreen
 import com.example.parcialtp3.ui.profile.SettingsScreen
 import com.example.parcialtp3.ui.profile.VoiceAiSettingsScreen
+import com.example.parcialtp3.viewmodel.AuthViewModel
 
 /**
- * Profile Flow. Guardar vuelve a la pantalla anterior. "Log out" limpia toda la pila y vuelve
- * al login (sin Firebase: perfil de demostracion).
+ * Profile Flow. Guardar vuelve a la pantalla anterior. "Log out" cierra la sesion (Firebase o
+ * demostracion), limpia toda la pila y vuelve al login: atras ya no regresa a la app.
  */
 fun NavGraphBuilder.profileGraph(navController: NavController) {
     navigation(
@@ -53,10 +55,14 @@ fun NavGraphBuilder.profileGraph(navController: NavController) {
             )
         }
         composable(AppDestination.Settings.route) {
+            val authViewModel: AuthViewModel = hiltViewModel()
             SettingsScreen(
                 onBackClick = { navController.popBackStack() },
                 onVoiceAiClick = { navController.navigate(AppDestination.VoiceAiSettings.route) },
-                onLogOutClick = { navController.navigateToLoginClearingBackStack() },
+                onLogOutClick = {
+                    authViewModel.signOut()
+                    navController.navigateToLoginClearingBackStack()
+                },
             )
         }
     }

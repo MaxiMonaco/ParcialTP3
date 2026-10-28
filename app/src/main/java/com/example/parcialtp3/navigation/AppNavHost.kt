@@ -15,10 +15,13 @@ import androidx.navigation.compose.rememberNavController
  * Raiz de la navegacion. Arma el Scaffold con la barra inferior (visible solo donde Figma la
  * muestra) y el NavHost con un grafo por flujo. La logica de cada flujo vive en su archivo
  * (LoginGraph.kt, WorkoutGraph.kt, ...), asi cada integrante toca el suyo sin pisarse.
+ *
+ * startDestination lo decide MainActivity: Login si no hay sesion, Home si ya habia una abierta.
  */
 @Composable
 fun AppNavHost(
     modifier: Modifier = Modifier,
+    startDestination: String = AppDestination.LoginFlow.route,
     navController: NavHostController = rememberNavController(),
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -39,7 +42,7 @@ fun AppNavHost(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = AppDestination.LoginFlow.route,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding),
         ) {
             loginGraph(navController)
